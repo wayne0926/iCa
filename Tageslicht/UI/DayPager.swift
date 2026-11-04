@@ -301,14 +301,15 @@ private struct WeatherGlyph: View {
         }
     }
 
-    /// How long the drops are. Kept when there is no rain, so they slide up into the cloud
-    /// whole rather than shrinking to dots.
+    /// How long the drops are. Without rain they keep the shortest length, still a stroke,
+    /// so leaving they only ever shorten as they slide up into the cloud, never reach
+    /// further down first, and are never left as dots.
     private var drops: CGFloat {
         switch kind {
-        case .drizzle: return 2.5
+        case .rain, .showers: return 5.5
         case .heavyRain: return 7.5
         case .sleet: return 3.5
-        default: return 5.5
+        default: return 2.5
         }
     }
 
