@@ -1,0 +1,3 @@
+// Shared build settings. API keys live in Secrets.xcconfig (gitignored);
+// copy Secrets.example.xcconfig to create it.
+#include? "Secrets.xcconfig"

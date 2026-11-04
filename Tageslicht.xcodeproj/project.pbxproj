@@ -1,0 +1,553 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0B2930022298CC1A2E9CB8C2 /* RoutesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CFFEB21E7E514C27BD01F2A /* RoutesService.swift */; };
+		12420FE53068F44040D3BEE5 /* SunCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82425AB49C84352EF14D8141 /* SunCalculator.swift */; };
+		23C291A769D938D425051E46 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A9DD952332E08B3E4A7AFF8 /* AppStore.swift */; };
+		283AD8AAD1F6BDFDDDD104B9 /* WeatherService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F471545FD25EA69790D47DC /* WeatherService.swift */; };
+		3D5AD63971DD4EBB40677BFD /* Blocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AAA3A0AABBCB151DEF7B9AE /* Blocks.swift */; };
+		46AD7CF52BF1936BFF07D804 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8DD90A24AD2B4FB9265335 /* SettingsView.swift */; };
+		5B0C60DF88E0CF89C08CF392 /* MonthCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D2BF616D7E1C5BDB0ADC14C /* MonthCalendar.swift */; };
+		6372D7CF7E09A72041DD1CEB /* RainLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0177CD915A2A1E4BCF4F01 /* RainLayer.swift */; };
+		701DC1BB40BF2AAEA704E172 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDD466A76C69A651671EF3AE /* Theme.swift */; };
+		882318462E5F679D82A2F188 /* TimeScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB512A88C2E0667F6C43707D /* TimeScale.swift */; };
+		8AD2F6338FAD75263A25DF52 /* Hyphenation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D3A2E89D860BC04752DF5E /* Hyphenation.swift */; };
+		974FBA7413BE19A84C5639DA /* LogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D75F8EEB762BCBDE84DD828 /* LogicTests.swift */; };
+		9D5D7EE731B79CA3EC268795 /* DayPager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECA59A2EB922034933D6DD2 /* DayPager.swift */; };
+		A8EECE82FDBDAEDFB72D1E84 /* DayTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = F91D7AE179F9323A4C825CED /* DayTimeline.swift */; };
+		AE4BF2E88249858A5BA94D1D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8B89FD4940902BC4B4BC6DC /* Models.swift */; };
+		AE6E12BF9B4273A65DE82CA4 /* PrecipSpan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FFC37FF59C876623FAC4C25 /* PrecipSpan.swift */; };
+		B3F1EB921EC8201F4989EF91 /* DayLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79157D3F4C0278A6378909E0 /* DayLayout.swift */; };
+		B7A99BEFA3DFD93267D5BAF1 /* FrameDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 188C13477CFF11D0FE23506E /* FrameDriver.swift */; };
+		CAE413988BDCB8A6DD7A7285 /* Infrastructure.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05A2B350B51E82359ECD2988 /* Infrastructure.swift */; };
+		D5BA185CFC0C36BC882C90DD /* TageslichtApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016811CA3C9A855EE4FEA77A /* TageslichtApp.swift */; };
+		D666F45F502836AED3BC9741 /* WeatherKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FFC884C81B19D09041A3A3E /* WeatherKind.swift */; };
+		D82EABBDF96FA0EF1CA82686 /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C3309E2020E6011D28E05CC /* EventDetailView.swift */; };
+		D955968D85D8610AFD61159B /* CalendarSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CDE7035F4E279F24A600CD8 /* CalendarSource.swift */; };
+		E63860E29FD2560959A5B798 /* DayPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EBCC94806269FFAE65946E0 /* DayPage.swift */; };
+		E6CBCFE23401AF79F054D9BA /* Geocoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CADDCBDABFB94CFE159719A1 /* Geocoder.swift */; };
+		E90F1C092B3C4F35868A81BA /* YearCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C899325BF463E35902AB62 /* YearCalendar.swift */; };
+		EA282BB6013D4C6610CE87AB /* DemoSeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE28B07C0E77DDBA79BC6F58 /* DemoSeed.swift */; };
+		F4219CABE82CC088DFEE2DD1 /* TravelPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B874687A5B6AD57558DACA93 /* TravelPolicy.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		BA6E51AD8561B5ADB9A63FA4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 34366A7988BD1F3B5AFF3E67 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1CA83FD136D7F541BB043526;
+			remoteInfo = Tageslicht;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		016811CA3C9A855EE4FEA77A /* TageslichtApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TageslichtApp.swift; sourceTree = "<group>"; };
+		05A2B350B51E82359ECD2988 /* Infrastructure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure.swift; sourceTree = "<group>"; };
+		0CFFEB21E7E514C27BD01F2A /* RoutesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutesService.swift; sourceTree = "<group>"; };
+		0D75F8EEB762BCBDE84DD828 /* LogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogicTests.swift; sourceTree = "<group>"; };
+		188C13477CFF11D0FE23506E /* FrameDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameDriver.swift; sourceTree = "<group>"; };
+		1AAA3A0AABBCB151DEF7B9AE /* Blocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Blocks.swift; sourceTree = "<group>"; };
+		1C0177CD915A2A1E4BCF4F01 /* RainLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RainLayer.swift; sourceTree = "<group>"; };
+		1F471545FD25EA69790D47DC /* WeatherService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherService.swift; sourceTree = "<group>"; };
+		28D3A2E89D860BC04752DF5E /* Hyphenation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hyphenation.swift; sourceTree = "<group>"; };
+		2A9DD952332E08B3E4A7AFF8 /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
+		3C3309E2020E6011D28E05CC /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
+		48C899325BF463E35902AB62 /* YearCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YearCalendar.swift; sourceTree = "<group>"; };
+		4FFC884C81B19D09041A3A3E /* WeatherKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherKind.swift; sourceTree = "<group>"; };
+		67FF3B857F76B32545EEA2F4 /* Tageslicht.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Tageslicht.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6FFC37FF59C876623FAC4C25 /* PrecipSpan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrecipSpan.swift; sourceTree = "<group>"; };
+		79157D3F4C0278A6378909E0 /* DayLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayLayout.swift; sourceTree = "<group>"; };
+		7CDE7035F4E279F24A600CD8 /* CalendarSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarSource.swift; sourceTree = "<group>"; };
+		7EBCC94806269FFAE65946E0 /* DayPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayPage.swift; sourceTree = "<group>"; };
+		82425AB49C84352EF14D8141 /* SunCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SunCalculator.swift; sourceTree = "<group>"; };
+		8ECA59A2EB922034933D6DD2 /* DayPager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayPager.swift; sourceTree = "<group>"; };
+		9B4B2311F4E018039AE02DEA /* TageslichtTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TageslichtTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		9D2BF616D7E1C5BDB0ADC14C /* MonthCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthCalendar.swift; sourceTree = "<group>"; };
+		B6088B2226F08C93A2F84326 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		B874687A5B6AD57558DACA93 /* TravelPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelPolicy.swift; sourceTree = "<group>"; };
+		BB512A88C2E0667F6C43707D /* TimeScale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeScale.swift; sourceTree = "<group>"; };
+		BD5A33CE2A62FF201BCF2C87 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		BE8DD90A24AD2B4FB9265335 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		CADDCBDABFB94CFE159719A1 /* Geocoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Geocoder.swift; sourceTree = "<group>"; };
+		CDD466A76C69A651671EF3AE /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		E8B89FD4940902BC4B4BC6DC /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		EE28B07C0E77DDBA79BC6F58 /* DemoSeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoSeed.swift; sourceTree = "<group>"; };
+		F91D7AE179F9323A4C825CED /* DayTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayTimeline.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		2690A3F0A65F4E7660ED5B9D /* TageslichtTests */ = {
+			isa = PBXGroup;
+			children = (
+				0D75F8EEB762BCBDE84DD828 /* LogicTests.swift */,
+			);
+			path = TageslichtTests;
+			sourceTree = "<group>";
+		};
+		393996B3152729EEECDC3E53 /* Logic */ = {
+			isa = PBXGroup;
+			children = (
+				79157D3F4C0278A6378909E0 /* DayLayout.swift */,
+				28D3A2E89D860BC04752DF5E /* Hyphenation.swift */,
+				6FFC37FF59C876623FAC4C25 /* PrecipSpan.swift */,
+				82425AB49C84352EF14D8141 /* SunCalculator.swift */,
+				BB512A88C2E0667F6C43707D /* TimeScale.swift */,
+				B874687A5B6AD57558DACA93 /* TravelPolicy.swift */,
+				4FFC884C81B19D09041A3A3E /* WeatherKind.swift */,
+			);
+			path = Logic;
+			sourceTree = "<group>";
+		};
+		3F8D8928F1E0BEBFA3600D61 /* Tageslicht */ = {
+			isa = PBXGroup;
+			children = (
+				BD5A33CE2A62FF201BCF2C87 /* Info.plist */,
+				4C9008C089C598EF67D84530 /* App */,
+				393996B3152729EEECDC3E53 /* Logic */,
+				D38CD3073D351F368BCB531A /* Model */,
+				B33C139867030697313FFB94 /* Services */,
+				B7F2FB1A52355BF8F22A5781 /* UI */,
+			);
+			path = Tageslicht;
+			sourceTree = "<group>";
+		};
+		4C9008C089C598EF67D84530 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				2A9DD952332E08B3E4A7AFF8 /* AppStore.swift */,
+				016811CA3C9A855EE4FEA77A /* TageslichtApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		B09229970CFEC70BD8D98466 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				67FF3B857F76B32545EEA2F4 /* Tageslicht.app */,
+				9B4B2311F4E018039AE02DEA /* TageslichtTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B33C139867030697313FFB94 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				7CDE7035F4E279F24A600CD8 /* CalendarSource.swift */,
+				EE28B07C0E77DDBA79BC6F58 /* DemoSeed.swift */,
+				CADDCBDABFB94CFE159719A1 /* Geocoder.swift */,
+				05A2B350B51E82359ECD2988 /* Infrastructure.swift */,
+				0CFFEB21E7E514C27BD01F2A /* RoutesService.swift */,
+				1F471545FD25EA69790D47DC /* WeatherService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		B750EE6DB4649653AC948BD0 = {
+			isa = PBXGroup;
+			children = (
+				FEE42BC824FB0B75FBFFA874 /* Config */,
+				3F8D8928F1E0BEBFA3600D61 /* Tageslicht */,
+				2690A3F0A65F4E7660ED5B9D /* TageslichtTests */,
+				B09229970CFEC70BD8D98466 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B7F2FB1A52355BF8F22A5781 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				1AAA3A0AABBCB151DEF7B9AE /* Blocks.swift */,
+				7EBCC94806269FFAE65946E0 /* DayPage.swift */,
+				8ECA59A2EB922034933D6DD2 /* DayPager.swift */,
+				F91D7AE179F9323A4C825CED /* DayTimeline.swift */,
+				3C3309E2020E6011D28E05CC /* EventDetailView.swift */,
+				188C13477CFF11D0FE23506E /* FrameDriver.swift */,
+				9D2BF616D7E1C5BDB0ADC14C /* MonthCalendar.swift */,
+				1C0177CD915A2A1E4BCF4F01 /* RainLayer.swift */,
+				BE8DD90A24AD2B4FB9265335 /* SettingsView.swift */,
+				CDD466A76C69A651671EF3AE /* Theme.swift */,
+				48C899325BF463E35902AB62 /* YearCalendar.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		D38CD3073D351F368BCB531A /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				E8B89FD4940902BC4B4BC6DC /* Models.swift */,
+			);
+			path = Model;
+			sourceTree = "<group>";
+		};
+		FEE42BC824FB0B75FBFFA874 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				B6088B2226F08C93A2F84326 /* Base.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0983902761DC861868C24A22 /* TageslichtTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BA005DE84FA1709E0D43D661 /* Build configuration list for PBXNativeTarget "TageslichtTests" */;
+			buildPhases = (
+				B15F4A673AFFA684560DF5A9 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DC8E8DCFD4005BBF7114D965 /* PBXTargetDependency */,
+			);
+			name = TageslichtTests;
+			packageProductDependencies = (
+			);
+			productName = TageslichtTests;
+			productReference = 9B4B2311F4E018039AE02DEA /* TageslichtTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		1CA83FD136D7F541BB043526 /* Tageslicht */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F5ACAD2C8577CCFEA1BABBBE /* Build configuration list for PBXNativeTarget "Tageslicht" */;
+			buildPhases = (
+				F41DAC45C55D0A4F9BC83FFC /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Tageslicht;
+			packageProductDependencies = (
+			);
+			productName = Tageslicht;
+			productReference = 67FF3B857F76B32545EEA2F4 /* Tageslicht.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		34366A7988BD1F3B5AFF3E67 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					0983902761DC861868C24A22 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					1CA83FD136D7F541BB043526 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 13C732926432C0202C31B45D /* Build configuration list for PBXProject "Tageslicht" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = B750EE6DB4649653AC948BD0;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = B09229970CFEC70BD8D98466 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1CA83FD136D7F541BB043526 /* Tageslicht */,
+				0983902761DC861868C24A22 /* TageslichtTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B15F4A673AFFA684560DF5A9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				974FBA7413BE19A84C5639DA /* LogicTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F41DAC45C55D0A4F9BC83FFC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				23C291A769D938D425051E46 /* AppStore.swift in Sources */,
+				3D5AD63971DD4EBB40677BFD /* Blocks.swift in Sources */,
+				D955968D85D8610AFD61159B /* CalendarSource.swift in Sources */,
+				B3F1EB921EC8201F4989EF91 /* DayLayout.swift in Sources */,
+				E63860E29FD2560959A5B798 /* DayPage.swift in Sources */,
+				9D5D7EE731B79CA3EC268795 /* DayPager.swift in Sources */,
+				A8EECE82FDBDAEDFB72D1E84 /* DayTimeline.swift in Sources */,
+				EA282BB6013D4C6610CE87AB /* DemoSeed.swift in Sources */,
+				D82EABBDF96FA0EF1CA82686 /* EventDetailView.swift in Sources */,
+				B7A99BEFA3DFD93267D5BAF1 /* FrameDriver.swift in Sources */,
+				E6CBCFE23401AF79F054D9BA /* Geocoder.swift in Sources */,
+				8AD2F6338FAD75263A25DF52 /* Hyphenation.swift in Sources */,
+				CAE413988BDCB8A6DD7A7285 /* Infrastructure.swift in Sources */,
+				AE4BF2E88249858A5BA94D1D /* Models.swift in Sources */,
+				5B0C60DF88E0CF89C08CF392 /* MonthCalendar.swift in Sources */,
+				AE6E12BF9B4273A65DE82CA4 /* PrecipSpan.swift in Sources */,
+				6372D7CF7E09A72041DD1CEB /* RainLayer.swift in Sources */,
+				0B2930022298CC1A2E9CB8C2 /* RoutesService.swift in Sources */,
+				46AD7CF52BF1936BFF07D804 /* SettingsView.swift in Sources */,
+				12420FE53068F44040D3BEE5 /* SunCalculator.swift in Sources */,
+				D5BA185CFC0C36BC882C90DD /* TageslichtApp.swift in Sources */,
+				701DC1BB40BF2AAEA704E172 /* Theme.swift in Sources */,
+				882318462E5F679D82A2F188 /* TimeScale.swift in Sources */,
+				F4219CABE82CC088DFEE2DD1 /* TravelPolicy.swift in Sources */,
+				D666F45F502836AED3BC9741 /* WeatherKind.swift in Sources */,
+				283AD8AAD1F6BDFDDDD104B9 /* WeatherService.swift in Sources */,
+				E90F1C092B3C4F35868A81BA /* YearCalendar.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		DC8E8DCFD4005BBF7114D965 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1CA83FD136D7F541BB043526 /* Tageslicht */;
+			targetProxy = BA6E51AD8561B5ADB9A63FA4 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		279EEFB1910238AF12C29032 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Tageslicht/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = us.lied.tageslicht;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		3DCA7879751E7333428912D4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = us.lied.TageslichtTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Tageslicht.app/Tageslicht";
+			};
+			name = Debug;
+		};
+		59471614E73ABAEAD2937AE2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B6088B2226F08C93A2F84326 /* Base.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		B7213D2BCDBA159AA1A69BCB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = us.lied.TageslichtTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Tageslicht.app/Tageslicht";
+			};
+			name = Release;
+		};
+		B89CEE12049F4E0872BF5640 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B6088B2226F08C93A2F84326 /* Base.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		DEA3E05EFFFF8FEB663CF10D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Tageslicht/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = us.lied.tageslicht;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		13C732926432C0202C31B45D /* Build configuration list for PBXProject "Tageslicht" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				59471614E73ABAEAD2937AE2 /* Debug */,
+				B89CEE12049F4E0872BF5640 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BA005DE84FA1709E0D43D661 /* Build configuration list for PBXNativeTarget "TageslichtTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3DCA7879751E7333428912D4 /* Debug */,
+				B7213D2BCDBA159AA1A69BCB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F5ACAD2C8577CCFEA1BABBBE /* Build configuration list for PBXNativeTarget "Tageslicht" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DEA3E05EFFFF8FEB663CF10D /* Debug */,
+				279EEFB1910238AF12C29032 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 34366A7988BD1F3B5AFF3E67 /* Project object */;
+}

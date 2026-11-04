@@ -1,0 +1,54 @@
+name: Tageslicht
+options:
+  bundleIdPrefix: us.lied
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1"
+targets:
+  Tageslicht:
+    type: application
+    platform: iOS
+    sources: [Tageslicht]
+    info:
+      path: Tageslicht/Info.plist
+      properties:
+        CFBundleDisplayName: Tageslicht
+        CFBundleDevelopmentRegion: zh-Hans
+        CFBundleShortVersionString: "0.8.8"
+        CFBundleVersion: "39"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSCalendarsFullAccessUsageDescription: 读取系统日历中的日程，在时间线上显示。
+        NSCalendarsUsageDescription: 读取系统日历中的日程，在时间线上显示。
+        NSLocationWhenInUseUsageDescription: 用当前位置获取天气、计算出发时间。
+        GoogleMapsAPIKey: $(GOOGLE_MAPS_API_KEY)
+        MeteoblueAPIKey: $(METEOBLUE_API_KEY)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: us.lied.tageslicht
+  TageslichtTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [TageslichtTests]
+    dependencies:
+      - target: Tageslicht
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Tageslicht:
+    build:
+      targets:
+        Tageslicht: all
+        TageslichtTests: [test]
+    test:
+      targets: [TageslichtTests]
