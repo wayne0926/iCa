@@ -80,16 +80,22 @@ struct WetDay: Hashable {
     /// Heaviest hour, mm/h.
     let intensity: Double
 
-    /// Likely enough to say so: the chance of rain in some waking hour, and enough of it
-    /// over the day to be more than a few drops.
-    static let chance = 60
+    /// Enough rain to be more than a few drops: a millimetre over the day, or several
+    /// waking hours with rain in them. The hourly chance of rain plays no part: meteoblue
+    /// and Open-Meteo give a day of steady rain hours of only 20–50 %, and the month must
+    /// show what the day page shows.
     static let millimetres = 1.0
+    static let wetHours = 3
+    /// Past the hourly forecast, ECMWF's runs vote: at least half of them with a millimetre.
+    /// Two weeks and more ahead the share stays near the season's usual (here about 30–60 %);
+    /// no day there is a sure thing, only likelier than the others.
+    static let outlookChance = 50
 
     init?(hours: [HourWeather]) {
-        let waking = hours.filter { (7..<23).contains(Calendar.current.component(.hour, from: $0.time)) }
-        guard let likely = waking.map(\.precipitationProbability).max(), likely >= Self.chance,
-              hours.reduce(0, { $0 + $1.precipitation }) >= Self.millimetres else { return nil }
         let wet = hours.filter { $0.precipitation >= PrecipSpan.threshold }
+        let wakingWet = wet.filter { (7..<23).contains(Calendar.current.component(.hour, from: $0.time)) }
+        guard hours.reduce(0, { $0 + $1.precipitation }) >= Self.millimetres || wakingWet.count >= Self.wetHours
+        else { return nil }
         let snowy = wet.filter { WeatherKind(pictocode: $0.pictocode) == .snow }.count
         snow = snowy * 2 > wet.count
         intensity = wet.map(\.precipitation).max() ?? 0
@@ -97,7 +103,7 @@ struct WetDay: Hashable {
 
     /// From the 46-day ensemble, past the hourly forecast: enough of its runs bring rain.
     init?(outlook o: DayOutlook) {
-        guard o.chance >= Self.chance else { return nil }
+        guard o.chance >= Self.outlookChance else { return nil }
         snow = o.snow
         // Spread over a few hours, as a day's rain usually is.
         intensity = o.millimetres / 6
