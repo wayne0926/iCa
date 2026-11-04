@@ -127,7 +127,7 @@ private struct YearSection: View {
                             MiniMonth(shape: MonthShape(m), isThisMonth: m == MonthCalendar.thisMonth, today: today)
                                 .contentShape(Rectangle())
                                 .onTapGesture { onPick(m) }
-                                .background { ZoomSource(kind: .month, date: m, marks: marks, zoom: zoom) }
+                                .modifier(ZoomSource(kind: .month, date: m, marks: marks, zoom: zoom))
                         }
                     }
                 }

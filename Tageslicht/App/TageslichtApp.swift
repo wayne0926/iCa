@@ -54,12 +54,6 @@ enum ZoomKey: Hashable {
     case day(Date), month(Date)
 }
 
-extension Color {
-    /// The frame a zoom runs from. Drawn, never seen: an empty Color.clear may not count as
-    /// a source, and the zoom then falls back to the middle of the screen.
-    static let zoomSource = Color.black.opacity(0.001)
-}
-
 #if DEBUG
 /// Launch with `-zoomProbe`: the system zoom with nothing of the app around it, one row per
 /// way of marking the source. A row whose pages open from and close into the middle of the
@@ -145,8 +139,8 @@ private struct ZoomProbe: View {
 
 /// Which day cell and which small month carry the zoom source. Each page zooms with one
 /// fixed source id, and the id moves: to what was tapped before the page opens, and to what
-/// the page shows now as it pages or scrolls, so it closes into that. Only the small
-/// `ZoomSource` frames read it, so moving it never redraws the grids around them.
+/// the page shows now as it pages or scrolls, so it closes into that. Only the
+/// `ZoomSource` modifiers read it, so moving it never redraws the cells or grids.
 @MainActor
 @Observable
 final class ZoomMarks {
@@ -159,10 +153,11 @@ final class ZoomMarks {
     var jump: Date?
 }
 
-/// The frame behind a day cell or a small month that the zoom runs from: not a picture of
-/// the cell, so the page alone grows and shrinks. It carries the shared id while its date
-/// is the shown one, its own otherwise.
-struct ZoomSource: View {
+/// Makes a day cell or a small month itself the zoom source, as Apple's own examples do:
+/// the system zooms from a picture of it into the page and back. It carries the shared id
+/// while its date is the shown one, its own otherwise. A modifier, so following the marks
+/// re-reads this alone, never the cell it wraps.
+struct ZoomSource: ViewModifier {
     enum Kind: Hashable { case day, month }
 
     let kind: Kind
@@ -170,11 +165,11 @@ struct ZoomSource: View {
     let marks: ZoomMarks
     let zoom: Namespace.ID
 
-    var body: some View {
+    func body(content: Content) -> some View {
         let id: ZoomKey = kind == .day
             ? (marks.day == date ? .shownDay : .day(date))
             : (marks.month == date ? .shownMonth : .month(date))
-        Color.zoomSource.matchedTransitionSource(id: id, in: zoom)
+        content.matchedTransitionSource(id: id, in: zoom)
     }
 }
 

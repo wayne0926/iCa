@@ -317,7 +317,7 @@ private struct WeekRow: View {
                         DayCell(day: day, isToday: day == today, items: items[day] ?? [], lanes: lanes, detailed: detailed)
                             .contentShape(Rectangle())
                             .onTapGesture { onOpen(day) }
-                            .background { ZoomSource(kind: .day, date: day, marks: marks, zoom: zoom) }
+                            .modifier(ZoomSource(kind: .day, date: day, marks: marks, zoom: zoom))
                     }
                 }
                 // Several-day events run across the week as one bar, under the day numbers.
