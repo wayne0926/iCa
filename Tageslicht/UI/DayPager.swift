@@ -12,8 +12,8 @@ struct DayPager: View {
     /// Paging back: the date's digits roll down.
     @State private var backwards = false
     /// Only a scroll moves the header; the offset a pager reports before it has been put
-    /// on its first page is not a day.
-    @State private var paging = PagingState()
+    /// on its first page is not a day. The rain on the pages beside follows it too.
+    @State private var activity = PagerActivity()
     @State private var detail: CalEvent?
     /// When the page came on screen, and whether it is on its way back: a tap that lands
     /// while the zoom still runs, opening or closing, is a tap meant for the month, never
@@ -90,6 +90,7 @@ struct DayPager: View {
             }
             .scrollTargetLayout()
         }
+        .environment(activity)
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: $selection)
         .scrollIndicators(.hidden)
@@ -99,14 +100,14 @@ struct DayPager: View {
             let width = g.containerSize.width
             return width > 0 ? Int(((g.contentOffset.x + g.contentInsets.leading) / width).rounded()) : -1
         } action: { _, i in
-            guard paging.moving, days.indices.contains(i) else { return }
+            guard activity.moving, days.indices.contains(i) else { return }
             show(days[i])
         }
         // Told once a page has settled, not as one slides past mid-swipe: what follows the
         // day (the zoom source, the month view behind scrolling to its month) then never
         // works during the swipe itself.
         .onScrollPhaseChange { _, phase in
-            paging.moving = phase.isScrolling
+            if activity.moving != phase.isScrolling { activity.moving = phase.isScrolling }
             if phase == .idle, let s = selection {
                 show(s)
                 onDayChange(s)
@@ -154,10 +155,6 @@ struct DayPager: View {
         detail = e
     }
 
-    /// Not observed: the phase changes nothing on screen by itself.
-    private final class PagingState {
-        var moving = false
-    }
 }
 
 private struct TodayLabelStyle: LabelStyle {
