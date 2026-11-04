@@ -23,8 +23,8 @@ targets:
       properties:
         CFBundleDisplayName: iCa
         CFBundleDevelopmentRegion: zh-Hans
-        CFBundleShortVersionString: "0.9.42"
-        CFBundleVersion: "83"
+        CFBundleShortVersionString: "0.9.43"
+        CFBundleVersion: "84"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSCalendarsFullAccessUsageDescription: 读取系统日历中的日程，在时间线上显示。
@@ -32,10 +32,40 @@ targets:
         NSLocationWhenInUseUsageDescription: 用当前位置获取天气、计算出发时间。
         GoogleMapsAPIKey: $(GOOGLE_MAPS_API_KEY)
         MeteoblueAPIKey: $(METEOBLUE_API_KEY)
+    entitlements:
+      path: Tageslicht/Tageslicht.entitlements
+      properties:
+        com.apple.security.application-groups: [group.us.lied.tageslicht.shared]
+    dependencies:
+      - target: TageslichtWidget
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: us.lied.tageslicht
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  TageslichtWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - TageslichtWidget
+      - Tageslicht/Shared/WidgetShared.swift
+    info:
+      path: TageslichtWidget/Info.plist
+      properties:
+        CFBundleDisplayName: iCa
+        CFBundleDevelopmentRegion: zh-Hans
+        CFBundleShortVersionString: "0.9.43"
+        CFBundleVersion: "84"
+        NSCalendarsFullAccessUsageDescription: 读取系统日历中的日程，在小组件上显示。
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: TageslichtWidget/TageslichtWidget.entitlements
+      properties:
+        com.apple.security.application-groups: [group.us.lied.tageslicht.shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: us.lied.tageslicht.Widget
+        SKIP_INSTALL: YES
   TageslichtTests:
     type: bundle.unit-test
     platform: iOS

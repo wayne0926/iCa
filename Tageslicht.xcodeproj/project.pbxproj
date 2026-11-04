@@ -37,6 +37,10 @@
 		E90F1C092B3C4F35868A81BA /* YearCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C899325BF463E35902AB62 /* YearCalendar.swift */; };
 		EA282BB6013D4C6610CE87AB /* DemoSeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE28B07C0E77DDBA79BC6F58 /* DemoSeed.swift */; };
 		F4219CABE82CC088DFEE2DD1 /* TravelPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B874687A5B6AD57558DACA93 /* TravelPolicy.swift */; };
+		F8E963055D11B3FC9BC1C08B /* WidgetShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8DDA15ABC811AAAF73F5AE /* WidgetShared.swift */; };
+		04BEA4EFF27190B7B714B491 /* WidgetShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8DDA15ABC811AAAF73F5AE /* WidgetShared.swift */; };
+		A5B6E033B1C05AC495F1B4E6 /* TageslichtWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 449D7400DE8C1C53E52BE55E /* TageslichtWidget.swift */; };
+		4236541923A622616E4E4630 /* TageslichtWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E2D55C84C4724A8757D3FC1D /* TageslichtWidget.appex */; settings = {ATTRIBUTES = (RemoveHeaderOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -47,7 +51,28 @@
 			remoteGlobalIDString = 1CA83FD136D7F541BB043526;
 			remoteInfo = Tageslicht;
 		};
+		E5947C104A491F292725EBB0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 34366A7988BD1F3B5AFF3E67 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DC46337DE96852257C28BC7C;
+			remoteInfo = TageslichtWidget;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		E02B03F3D35921A7918D474D /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				4236541923A622616E4E4630 /* TageslichtWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		016811CA3C9A855EE4FEA77A /* TageslichtApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TageslichtApp.swift; sourceTree = "<group>"; };
@@ -84,7 +109,23 @@
 		E8B89FD4940902BC4B4BC6DC /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		EE28B07C0E77DDBA79BC6F58 /* DemoSeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoSeed.swift; sourceTree = "<group>"; };
 		F91D7AE179F9323A4C825CED /* DayTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayTimeline.swift; sourceTree = "<group>"; };
+		3A8DDA15ABC811AAAF73F5AE /* WidgetShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetShared.swift; sourceTree = "<group>"; };
+		449D7400DE8C1C53E52BE55E /* TageslichtWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TageslichtWidget.swift; sourceTree = "<group>"; };
+		8BEA6E0B28607CA8750447EA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		5D7BF35990879FF61577A096 /* TageslichtWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TageslichtWidget.entitlements; sourceTree = "<group>"; };
+		E28EEA6422D9079058B27D4C /* Tageslicht.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Tageslicht.entitlements; sourceTree = "<group>"; };
+		E2D55C84C4724A8757D3FC1D /* TageslichtWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TageslichtWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5AE5E616F3536080DD7560A0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		2690A3F0A65F4E7660ED5B9D /* TageslichtTests */ = {
@@ -114,10 +155,12 @@
 			children = (
 				12A38550B0FE9E98C9EDE52D /* Assets.xcassets */,
 				BD5A33CE2A62FF201BCF2C87 /* Info.plist */,
+				E28EEA6422D9079058B27D4C /* Tageslicht.entitlements */,
 				4C9008C089C598EF67D84530 /* App */,
 				393996B3152729EEECDC3E53 /* Logic */,
 				D38CD3073D351F368BCB531A /* Model */,
 				B33C139867030697313FFB94 /* Services */,
+				44D97F4D2F198EEFC0A8A988 /* Shared */,
 				B7F2FB1A52355BF8F22A5781 /* UI */,
 			);
 			path = Tageslicht;
@@ -137,6 +180,7 @@
 			children = (
 				67FF3B857F76B32545EEA2F4 /* Tageslicht.app */,
 				9B4B2311F4E018039AE02DEA /* TageslichtTests.xctest */,
+				E2D55C84C4724A8757D3FC1D /* TageslichtWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -161,6 +205,7 @@
 				FEE42BC824FB0B75FBFFA874 /* Config */,
 				3F8D8928F1E0BEBFA3600D61 /* Tageslicht */,
 				2690A3F0A65F4E7660ED5B9D /* TageslichtTests */,
+				97E9CA0340AC5C0C7FC5990B /* TageslichtWidget */,
 				B09229970CFEC70BD8D98466 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -199,6 +244,24 @@
 			path = Config;
 			sourceTree = "<group>";
 		};
+		44D97F4D2F198EEFC0A8A988 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				3A8DDA15ABC811AAAF73F5AE /* WidgetShared.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		97E9CA0340AC5C0C7FC5990B /* TageslichtWidget */ = {
+			isa = PBXGroup;
+			children = (
+				8BEA6E0B28607CA8750447EA /* Info.plist */,
+				5D7BF35990879FF61577A096 /* TageslichtWidget.entitlements */,
+				449D7400DE8C1C53E52BE55E /* TageslichtWidget.swift */,
+			);
+			path = TageslichtWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -226,10 +289,12 @@
 			buildPhases = (
 				F41DAC45C55D0A4F9BC83FFC /* Sources */,
 				C797678B0E1DA3BB4EDA8462 /* Resources */,
+				E02B03F3D35921A7918D474D /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A820D15DCDC549322D8C6920 /* PBXTargetDependency */,
 			);
 			name = Tageslicht;
 			packageProductDependencies = (
@@ -237,6 +302,24 @@
 			productName = Tageslicht;
 			productReference = 67FF3B857F76B32545EEA2F4 /* Tageslicht.app */;
 			productType = "com.apple.product-type.application";
+		};
+		DC46337DE96852257C28BC7C /* TageslichtWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C1A2A40B474A1B595C12EF3A /* Build configuration list for PBXNativeTarget "TageslichtWidget" */;
+			buildPhases = (
+				58AA683AEC33B85430B5F346 /* Sources */,
+				5AE5E616F3536080DD7560A0 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TageslichtWidget;
+			packageProductDependencies = (
+			);
+			productName = TageslichtWidget;
+			productReference = E2D55C84C4724A8757D3FC1D /* TageslichtWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -252,6 +335,10 @@
 						ProvisioningStyle = Automatic;
 					};
 					1CA83FD136D7F541BB043526 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					DC46337DE96852257C28BC7C = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
@@ -273,6 +360,7 @@
 			targets = (
 				1CA83FD136D7F541BB043526 /* Tageslicht */,
 				0983902761DC861868C24A22 /* TageslichtTests */,
+				DC46337DE96852257C28BC7C /* TageslichtWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -327,8 +415,18 @@
 				882318462E5F679D82A2F188 /* TimeScale.swift in Sources */,
 				F4219CABE82CC088DFEE2DD1 /* TravelPolicy.swift in Sources */,
 				D666F45F502836AED3BC9741 /* WeatherKind.swift in Sources */,
+				F8E963055D11B3FC9BC1C08B /* WidgetShared.swift in Sources */,
 				283AD8AAD1F6BDFDDDD104B9 /* WeatherService.swift in Sources */,
 				E90F1C092B3C4F35868A81BA /* YearCalendar.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		58AA683AEC33B85430B5F346 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A5B6E033B1C05AC495F1B4E6 /* TageslichtWidget.swift in Sources */,
+				04BEA4EFF27190B7B714B491 /* WidgetShared.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -340,6 +438,11 @@
 			target = 1CA83FD136D7F541BB043526 /* Tageslicht */;
 			targetProxy = BA6E51AD8561B5ADB9A63FA4 /* PBXContainerItemProxy */;
 		};
+		A820D15DCDC549322D8C6920 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DC46337DE96852257C28BC7C /* TageslichtWidget */;
+			targetProxy = E5947C104A491F292725EBB0 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -348,6 +451,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_ENTITLEMENTS = Tageslicht/Tageslicht.entitlements;
 				INFOPLIST_FILE = Tageslicht/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -525,6 +629,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_ENTITLEMENTS = Tageslicht/Tageslicht.entitlements;
 				INFOPLIST_FILE = Tageslicht/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -535,6 +640,42 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
+		};
+		E27D63F3C35B3F39341514BC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TageslichtWidget/TageslichtWidget.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = TageslichtWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = us.lied.tageslicht.Widget;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		307BB451A121099C61051C95 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TageslichtWidget/TageslichtWidget.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = TageslichtWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = us.lied.tageslicht.Widget;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
@@ -562,6 +703,15 @@
 			buildConfigurations = (
 				DEA3E05EFFFF8FEB663CF10D /* Debug */,
 				279EEFB1910238AF12C29032 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C1A2A40B474A1B595C12EF3A /* Build configuration list for PBXNativeTarget "TageslichtWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E27D63F3C35B3F39341514BC /* Debug */,
+				307BB451A121099C61051C95 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

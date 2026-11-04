@@ -1,6 +1,7 @@
 import EventKit
 import Observation
 import UIKit
+import WidgetKit
 
 /// Everything one day page draws. Each page observes only its own model,
 /// so loading tomorrow's routes never re-renders today.
@@ -138,6 +139,8 @@ final class AppStore {
     /// ECMWF's 46-day outlook by area, for the month's days past the hourly forecast.
     @ObservationIgnored private var outlooks: [Coordinate: [Date: DayOutlook]] = [:]
     @ObservationIgnored private var radarLoop: Task<Void, Never>?
+    @ObservationIgnored private var widgetWrite: Task<Void, Never>?
+    @ObservationIgnored private var lastSnapshot: WidgetSnapshot?
     @ObservationIgnored private let geocoder = Geocoder()
     /// Event addresses already placed on the map, and those Apple couldn't find.
     @ObservationIgnored private var places: [String: Coordinate] = [:]
@@ -200,6 +203,8 @@ final class AppStore {
         guard started else { return }
         await refreshRadar()
         await refreshWeather(force: false)
+        // A new day may have begun since the widget was last told.
+        scheduleWidgetSnapshot()
         if let today = models[calendar.startOfDay(for: Date())] { await loadTravel(for: today) }
     }
 
@@ -259,6 +264,7 @@ final class AppStore {
         }
         events.merge(byDay) { _, new in new }
         learnUsual()
+        scheduleWidgetSnapshot()
         for m in models.values {
             if m.usual != usual { m.usual = usual }
             if let hit = events[m.day] { fill(m, with: hit) }
@@ -428,6 +434,7 @@ final class AppStore {
             replan(m)
         }
         for m in months.values { fillWet(m) }
+        scheduleWidgetSnapshot()
     }
 
     /// Where a day's weather comes from: the first of its events that can be placed on the
@@ -531,6 +538,45 @@ final class AppStore {
             }
         }
         if wet != m.wet { m.wet = wet }
+    }
+
+    // MARK: - Widget
+
+    /// Changes come in bursts (a sync, a forecast for several places): one write once they
+    /// have stopped for a moment.
+    private func scheduleWidgetSnapshot() {
+        widgetWrite?.cancel()
+        widgetWrite = Task {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            writeWidgetSnapshot()
+        }
+    }
+
+    /// Today and the next two days as the widget needs them: each day's weather from its own
+    /// place, its timed events, and the calendars switched off. The widget is told to redraw
+    /// only when any of it changed: its redraws are rationed.
+    private func writeWidgetSnapshot() {
+        let today = calendar.startOfDay(for: Date())
+        var days: [WidgetSnapshot.Day] = []
+        for k in 0..<3 {
+            guard let d = calendar.date(byAdding: .day, value: k, to: today),
+                  let next = calendar.date(byAdding: .day, value: 1, to: d) else { continue }
+            let list = events[d] ?? []
+            let timed = list.filter { !$0.isAllDay }.map { e in
+                WidgetSnapshot.Event(id: e.id, title: e.title, start: e.start, end: e.end, location: e.location,
+                                     r: e.calendarColor.r, g: e.calendarColor.g, b: e.calendarColor.b)
+            }
+            let forecast = forecasts[area(on: d)] ?? forecasts[here.area] ?? []
+            let symbol = DaySummary(hours: forecast.filter { $0.time >= d && $0.time < next }, calendar: calendar)?
+                .symbol.replacingOccurrences(of: ".fill", with: "")
+            days.append(WidgetSnapshot.Day(day: d, symbol: symbol, events: timed, allDay: list.count - timed.count))
+        }
+        let snapshot = WidgetSnapshot(days: days, hidden: hiddenCalendars.sorted())
+        guard snapshot != lastSnapshot else { return }
+        lastSnapshot = snapshot
+        snapshot.write()
+        WidgetCenter.shared.reloadTimelines(ofKind: "DayTimeline")
     }
 
     // MARK: - Radar
