@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// How the month view colours its events, and which calendars the app shows, grouped by
-/// account. A tap toggles one; the change reaches the month and day pages at once.
+/// How the month view colours its events, which calendars the app shows (folded away until
+/// asked for, grouped by account), and which build this is. A tap toggles a calendar; the
+/// change reaches the month and day pages at once.
 struct SettingsView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var groups: [(source: String, calendars: [CalendarSource.Info])] = []
     @AppStorage(MonthColorStyle.key) private var colorStyle = MonthColorStyle.dot
+    @State private var calendarsOpen = false
 
     var body: some View {
         NavigationStack {
@@ -20,12 +22,28 @@ struct SettingsView: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
                 }
-                ForEach(groups, id: \.source) { group in
-                    Section(group.source) {
-                        ForEach(group.calendars) { cal in
-                            row(cal)
+                Section {
+                    DisclosureGroup(isExpanded: $calendarsOpen) {
+                        ForEach(groups, id: \.source) { group in
+                            Text(group.source)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(Theme.graphite)
+                            ForEach(group.calendars) { cal in
+                                row(cal)
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text("显示的日历")
+                            Spacer(minLength: 0)
+                            Text(shownSummary)
+                                .monospacedDigit()
+                                .foregroundStyle(Theme.graphite)
                         }
                     }
+                }
+                Section {
+                    LabeledContent("版本", value: Self.version)
                 }
             }
             .navigationTitle("设置")
@@ -39,6 +57,21 @@ struct SettingsView: View {
         .tint(Theme.ink)
         .onAppear { groups = store.calendarGroups() }
     }
+
+    /// How many of the calendars are shown, e.g. "5 / 7".
+    private var shownSummary: String {
+        let all = groups.flatMap(\.calendars)
+        let shown = all.filter { !store.hiddenCalendars.contains($0.id) }.count
+        return "\(shown) / \(all.count)"
+    }
+
+    /// Version and build, so two builds can be told apart.
+    static let version: String = {
+        let info = Bundle.main.infoDictionary
+        let v = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let b = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(v) (\(b))"
+    }()
 
     private func row(_ cal: CalendarSource.Info) -> some View {
         let shown = !store.hiddenCalendars.contains(cal.id)

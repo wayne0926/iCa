@@ -15,10 +15,8 @@ struct DayPager: View {
     private let onDayChange: (Date) -> Void
     /// Back to the month grid.
     private let onClose: () -> Void
-    private let zoom: Namespace.ID
 
-    init(start: Date, zoom: Namespace.ID, onDayChange: @escaping (Date) -> Void, onClose: @escaping () -> Void) {
-        self.zoom = zoom
+    init(start: Date, onDayChange: @escaping (Date) -> Void, onClose: @escaping () -> Void) {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
         let start = cal.startOfDay(for: start)
@@ -78,8 +76,6 @@ struct DayPager: View {
                             sameRoom: model.sameRoom.contains(e.id))
                 .presentationDetents([.medium, .large])
         }
-        // Closes into the cell of the day shown now, wherever paging has got to.
-        .navigationTransition(.zoom(sourceID: ZoomID.day(selection ?? days[0]), in: zoom))
     }
 }
 
