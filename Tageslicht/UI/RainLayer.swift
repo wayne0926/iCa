@@ -110,13 +110,13 @@ struct RainLayer: View {
         private var air: CGPoint = .zero
         private var airSpeed: CGVector = .zero
         /// How quickly the air takes up the page's motion, rad/s (critically damped).
-        private static let give: CGFloat = 16
+        private static let give: CGFloat = 24
         /// Per depth, one pendulum at the top of the screen and one at the bottom.
         private var pendulums: [Pendulum] = (0..<RainLayer.depths).flatMap { d -> [Pendulum] in
             let near = (Double(d) + 0.5) / Double(RainLayer.depths)
             // Heavier, slower far drops; the bottom of the screen a beat behind the top.
-            let period = 1.25 - 0.35 * near
-            return [Pendulum(period: period, damping: 0.2), Pendulum(period: period * 1.25, damping: 0.18)]
+            let period = 0.95 - 0.27 * near
+            return [Pendulum(period: period, damping: 0.2), Pendulum(period: period * 1.15, damping: 0.18)]
         }
         private(set) var frame = Frame.rest
 
