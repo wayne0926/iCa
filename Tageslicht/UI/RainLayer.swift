@@ -358,19 +358,16 @@ struct RainLayer: View {
     }
 }
 
-/// Sunshine across the hours forecast clear and cloudless: the sun stands just past the
-/// right edge, where its ball sits, and lights the stretch from there. A broad soft glow,
-/// brightest at the edge and fading across the page, breathing slowly; a few wide beams
-/// fanning out of it that sway a degree or two and brighten and dim, each at its own pace.
-/// Beams spread from one point and widen as they go, so they read as light from the sun,
-/// not as stripes. On a long stretch the sun stands again further down.
+/// Sunshine across the hours forecast clear and cloudless, as light falls through leaves:
+/// clusters of soft, slightly wide spots of light that sway a few points in a breeze and
+/// brighten and dim, each at its own pace. Light, not ink: on the pale page the stretch
+/// dims a little first, so the spots stand out brighter than the paper; on the black page
+/// they glow by themselves. Behind the cards only.
 ///
-/// Light, not ink: on the pale page it brightens to the white of the cards, on the black
-/// one it is a glow. Behind the cards only. Like the rain, no hard box: it fades in over
-/// the stretch above its first hour and out below its last, and towards the hour labels.
-/// Placed by a fixed hash and moved by the clock, nothing kept between frames; the clock
-/// runs only on the page in view (and while paging), at 30 frames a second, and stops under
-/// Reduce Motion and in Low Power Mode.
+/// Like the rain, no hard box: it fades in over the stretch above its first hour and out
+/// below its last, and towards the hour labels. Placed by a fixed hash and moved by the
+/// clock, nothing kept between frames; the clock runs only on the page in view (and while
+/// paging), at 30 frames a second, and stops under Reduce Motion and in Low Power Mode.
 struct SunshineLayer: View {
     /// Seeds the hash, so separate sunny stretches don't move in step.
     let index: Int
@@ -380,9 +377,9 @@ struct SunshineLayer: View {
     @State private var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
     @Environment(PagerActivity.self) private var pager: PagerActivity?
 
-    private static let beams = 5
-    /// One sun per this much height of sunny stretch.
-    private static let reach: CGFloat = 520
+    /// One cluster of spots per this much height.
+    private static let pitch: CGFloat = 110
+    private static let spotsPerCluster = 9
 
     var body: some View {
         let still = !(active || pager?.moving == true) || reduceMotion || lowPower
@@ -417,50 +414,37 @@ struct SunshineLayer: View {
 
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, t: Double) {
         let light = Theme.sunlight
-        let suns = max(1, Int((size.height / Self.reach).rounded()))
-        let radius = max(size.width * 0.9, 240)
-        // Away from the sun the stretch dims a little (pale page only), so the light shows.
-        let shade = Gradient(stops: [.init(color: Theme.sunShade, location: 0),
-                                     .init(color: Theme.sunShade.opacity(0), location: 0.8)])
-        ctx.fill(Path(CGRect(origin: .zero, size: size)),
-                 with: .linearGradient(shade, startPoint: .zero, endPoint: CGPoint(x: size.width, y: 0)))
-        for k in 0..<suns {
-            let phase = Double(k) * 1.7 + Double(index) * 2.3
-            let y = size.height * (CGFloat(k) + 0.5) / CGFloat(suns) + 16 * CGFloat(sin(t * 2 * .pi / 23 + phase))
-            let sun = CGPoint(x: size.width + 20, y: y)
-            // The glow.
-            let pulse = 0.9 + 0.1 * sin(t * 2 * .pi / 9 + phase)
-            let glow = Gradient(stops: [.init(color: light.opacity(0.9 * pulse), location: 0),
-                                        .init(color: light.opacity(0.4 * pulse), location: 0.4),
-                                        .init(color: light.opacity(0), location: 1)])
-            ctx.fill(Path(ellipseIn: CGRect(x: sun.x - radius, y: sun.y - radius, width: radius * 2, height: radius * 2)),
-                     with: .radialGradient(glow, center: sun, startRadius: 0, endRadius: radius))
-            // The beams, fanned to the left. Each is three nested wedges, so its sides are
-            // soft rather than cut.
-            for i in 0..<Self.beams {
-                let seed = k * 31 + i
-                let spread = (Double(i) - Double(Self.beams - 1) / 2) * 15 + (rand(seed, 1) - 0.5) * 6
-                let sway = 2.2 * sin(t * 2 * .pi / (13 + 7 * rand(seed, 2)) + rand(seed, 3) * 6.28)
-                let angle = (180 + spread + sway) * .pi / 180
-                let shine = 0.5 + 0.5 * sin(t * 2 * .pi / (8 + 6 * rand(seed, 4)) + rand(seed, 5) * 6.28)
-                let strength = 0.3 * (0.35 + 0.65 * shine)
-                let length = radius * CGFloat(1.1 + 0.3 * rand(seed, 6))
-                let fade = Gradient(stops: [.init(color: light.opacity(strength), location: 0),
+        ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Theme.sunShade))
+        let clusters = max(2, Int(size.height / Self.pitch))
+        for c in 0..<clusters {
+            let cx = Theme.gutter + CGFloat(rand(c, 21)) * (size.width - Theme.gutter)
+            let cy = (CGFloat(c) + 0.5) / CGFloat(clusters) * size.height + CGFloat(rand(c, 22) - 0.5) * 60
+            for j in 0..<Self.spotsPerCluster {
+                let i = c * 16 + j
+                let r = CGFloat(7 + 15 * rand(i, 1))
+                // Spread wide rather than tall, thicker towards the middle of the cluster.
+                let angle = rand(i, 2) * 2 * .pi
+                let dist = pow(rand(i, 3), 0.7) * 70
+                let swing = 3 + 4 * rand(i, 4)
+                let w = 2 * .pi / (4 + 5 * rand(i, 5))
+                let x = cx + CGFloat(cos(angle) * dist * 1.4 + swing * sin(w * t + rand(i, 6) * 6.28))
+                let y = cy + CGFloat(sin(angle) * dist * 0.8 + 0.5 * swing * sin(1.3 * w * t + rand(i, 7) * 6.28))
+                let life = 0.6 + 0.4 * sin(2 * .pi * t / (7 + 6 * rand(i, 8)) + rand(i, 9) * 6.28)
+                let alpha = life * (0.7 + 0.3 * rand(i, 10))
+                // Full to two thirds of the way out, then a soft edge.
+                let spot = Gradient(stops: [.init(color: light.opacity(alpha), location: 0),
+                                            .init(color: light.opacity(alpha), location: 0.65),
                                             .init(color: light.opacity(0), location: 1)])
-                for half in [5.5, 3.4, 1.6] {
-                    let a = half * .pi / 180
-                    var wedge = Path()
-                    wedge.move(to: sun)
-                    wedge.addLine(to: CGPoint(x: sun.x + length * CGFloat(cos(angle - a)), y: sun.y + length * CGFloat(sin(angle - a))))
-                    wedge.addLine(to: CGPoint(x: sun.x + length * CGFloat(cos(angle + a)), y: sun.y + length * CGFloat(sin(angle + a))))
-                    wedge.closeSubpath()
-                    ctx.fill(wedge, with: .radialGradient(fade, center: sun, startRadius: 0, endRadius: length))
-                }
+                var s = ctx
+                s.translateBy(x: x, y: y)
+                s.scaleBy(x: 1.3, y: 1)
+                s.fill(Path(ellipseIn: CGRect(x: -r, y: -r, width: r * 2, height: r * 2)),
+                       with: .radialGradient(spot, center: .zero, startRadius: 0, endRadius: r))
             }
         }
     }
 
-    /// Stable pseudo-random in [0, 1) per beam and channel.
+    /// Stable pseudo-random in [0, 1) per spot and channel.
     private func rand(_ i: Int, _ channel: Int) -> Double {
         let v = sin(Double(index * 7919 + i * 104_729 + channel * 1_299_709) * 12.9898) * 43758.5453
         return v - floor(v)

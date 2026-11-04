@@ -36,13 +36,13 @@ enum Theme {
     /// Sunshine on the page: light, so on the pale page it is brighter than the paper and on
     /// the black one a faint glow.
     static let sunlight = Color(UIColor { t in
-        t.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.16) : UIColor(white: 1, alpha: 1)
+        t.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.2) : UIColor(white: 1, alpha: 1)
     })
     /// Under the sunshine on the pale page, where light alone hardly shows on the near-white
-    /// paper: the stretch dims a little away from the sun, so the light near it stands out.
-    /// Nothing on the black page, where the light shows by itself.
+    /// paper: the stretch dims a little, as in the shade of leaves, so the spots of light
+    /// stand out. Nothing on the black page, where the light shows by itself.
     static let sunShade = Color(UIColor { t in
-        t.userInterfaceStyle == .dark ? .clear : UIColor(white: 0, alpha: 0.05)
+        t.userInterfaceStyle == .dark ? .clear : UIColor(white: 0, alpha: 0.08)
     })
     /// Rain: wet hours, and trips moved onto transit because of it.
     static let rain = dynamic(light: (0.16, 0.47, 0.84), dark: (0.40, 0.66, 0.96))
