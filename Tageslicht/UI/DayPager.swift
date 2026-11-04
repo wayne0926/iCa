@@ -229,16 +229,8 @@ private struct DayHeader: View {
                 .accessibilityLabel("返回月历")
                 Spacer(minLength: 0)
                 if let s = model.summary {
-                    HStack(spacing: 5) {
-                        Image(systemName: s.symbol)
-                            .foregroundStyle(Theme.symbolTint(s.kind, daylight: true))
-                            .contentTransition(.symbolEffect(.replace))
-                        Text("\(s.low)° / \(s.high)°")
-                            .monospacedDigit()
-                            .contentTransition(.numericText(countsDown: backwards))
-                    }
-                    .font(.system(size: 15, weight: .semibold))
-                    .transition(.opacity)
+                    WeatherGlyph(kind: s.kind)
+                        .transition(.opacity)
                 }
             }
             HStack(spacing: 4) {
@@ -271,6 +263,103 @@ private struct DayHeader: View {
         .padding(.top, 8)
         .padding(.bottom, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// The day's weather in the header's ink, built from layers instead of one symbol per kind,
+/// so paging between days changes only what differs: a cloud slides in front of the sun and
+/// hides it, the sun peeks out from behind, rain or snow appears under the same cloud (the
+/// system's Magic Replace, where it can match the two symbols).
+private struct WeatherGlyph: View {
+    let kind: WeatherKind
+
+    private static let motion = Animation.smooth(duration: 0.5)
+    private static let swap = ContentTransition.symbolEffect(.replace.magic(fallback: .replace.downUp))
+
+    private enum Sun { case full, peek, gone }
+
+    private var sun: Sun {
+        switch kind {
+        case .clear: return .full
+        case .fewClouds, .showers: return .peek
+        default: return .gone
+        }
+    }
+
+    /// The cloud's symbol; nil when the sky is clear.
+    private var cloud: String? {
+        switch kind {
+        case .clear: return nil
+        case .fewClouds, .cloudy: return "cloud"
+        case .fog: return "cloud.fog"
+        case .drizzle: return "cloud.drizzle"
+        case .rain, .showers: return "cloud.rain"
+        case .heavyRain: return "cloud.heavyrain"
+        case .snow: return "cloud.snow"
+        case .sleet: return "cloud.sleet"
+        case .thunder: return "cloud.bolt.rain"
+        }
+    }
+
+    var body: some View {
+        // A clear sky keeps the plain cloud, faded out, so the next cloud has one to grow from.
+        let name = cloud ?? "cloud"
+        let shown = cloud != nil
+        let peek = sun == .peek
+        ZStack {
+            Image(systemName: "sun.max")
+                .scaleEffect(sun == .full ? 1 : peek ? 0.68 : 0.5)
+                .offset(x: sun == .full ? 0 : peek ? 5 : 3, y: sun == .full ? 0 : peek ? -4 : -2)
+                .opacity(sun == .gone ? 0 : 1)
+            // The cloud's shape, a little larger, cut out of the sun behind it: the cloud reads
+            // as in front, with a sliver of air between them, on any background.
+            Image(systemName: name + ".fill")
+                .contentTransition(Self.swap)
+                .scaleEffect(1.14)
+                .blendMode(.destinationOut)
+                .modifier(CloudPlace(shown: shown, peek: peek))
+            Image(systemName: name)
+                .contentTransition(Self.swap)
+                .modifier(CloudPlace(shown: shown, peek: peek))
+        }
+        .compositingGroup()
+        .font(.system(size: 17, weight: .semibold))
+        .symbolRenderingMode(.monochrome)
+        .foregroundStyle(Theme.ink)
+        .frame(width: 30, height: 26)
+        .animation(Self.motion, value: kind)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+    }
+
+    /// Where the cloud sits: in from the lower left when it comes, beside the sun when the
+    /// sun peeks out, the whole glyph otherwise.
+    private struct CloudPlace: ViewModifier {
+        let shown: Bool
+        let peek: Bool
+
+        func body(content: Content) -> some View {
+            content
+                .scaleEffect(!shown ? 0.8 : peek ? 0.88 : 1)
+                .offset(x: !shown ? -10 : peek ? -2 : 0, y: !shown ? 3 : peek ? 2 : 0)
+                .opacity(shown ? 1 : 0)
+        }
+    }
+
+    private var label: String {
+        switch kind {
+        case .clear: return "晴"
+        case .fewClouds: return "晴间多云"
+        case .cloudy: return "多云"
+        case .fog: return "雾"
+        case .drizzle: return "毛毛雨"
+        case .rain: return "雨"
+        case .heavyRain: return "大雨"
+        case .snow: return "雪"
+        case .sleet: return "雨夹雪"
+        case .thunder: return "雷雨"
+        case .showers: return "阵雨"
+        }
     }
 }
 

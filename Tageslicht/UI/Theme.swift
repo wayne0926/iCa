@@ -29,8 +29,6 @@ enum Theme {
     /// so it steps back a little; in light mode it stays full ink.
     static let hourInk = Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.72) : .label })
     static let shadow = Color(UIColor { $0.userInterfaceStyle == .dark ? .clear : UIColor.black.withAlphaComponent(0.12) })
-    /// Daylight: sunrise/sunset, clear sky.
-    static let sun = dynamic(light: (0.91, 0.58, 0.13), dark: (0.95, 0.70, 0.36))
     /// The sunrise/sunset ball: a faint grey disc, just enough to hold its glyph.
     static let sunBall = Color(UIColor { t in
         t.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.12) : UIColor(white: 0, alpha: 0.06)
@@ -44,15 +42,6 @@ enum Theme {
             let c = t.userInterfaceStyle == .dark ? dark : light
             return UIColor(red: c.0, green: c.1, blue: c.2, alpha: 1)
         })
-    }
-
-    /// Tint for a weather symbol: sun-ish amber, wet blue, otherwise neutral.
-    static func symbolTint(_ kind: WeatherKind, daylight: Bool) -> Color {
-        if kind.isWet { return rain }
-        switch kind {
-        case .clear, .fewClouds: return daylight ? sun : graphite
-        default: return graphite
-        }
     }
 }
 
