@@ -41,7 +41,7 @@ struct DayPager: View {
             LazyHStack(spacing: 0) {
                 ForEach(days, id: \.self) { day in
                     DayPage(model: store.model(for: day), isToday: day == today, isActive: day == selection,
-                            anchor: $anchor, onSelect: { detail = $0 }, onClose: onClose)
+                            anchor: $anchor, onSelect: { detail = $0 }, onClose: close)
                         .containerRelativeFrame(.horizontal)
                 }
             }
@@ -50,7 +50,12 @@ struct DayPager: View {
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: $selection)
         .scrollIndicators(.hidden)
-        .onChange(of: selection) { _, new in if let new { onDayChange(new) } }
+        // Told once a page has settled, not as one slides past mid-swipe: what follows the
+        // day (the zoom source, the month view behind scrolling to its month) then never
+        // works during the swipe itself.
+        .onScrollPhaseChange { _, phase in
+            if phase == .idle, let s = selection { onDayChange(s) }
+        }
         .overlay(alignment: .bottomTrailing) {
             if let s = selection, s != today {
                 Button {
@@ -76,6 +81,13 @@ struct DayPager: View {
                             sameRoom: model.sameRoom.contains(e.id))
                 .presentationDetents([.medium, .large])
         }
+    }
+
+    /// The date tapped before the page settled: name the day in view first, so the page
+    /// closes into its cell.
+    private func close() {
+        if let s = selection { onDayChange(s) }
+        onClose()
     }
 }
 

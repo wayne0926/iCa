@@ -19,9 +19,9 @@ struct DayPage: View {
     @State private var position = ScrollPosition(edge: .top)
     @State private var didScroll = false
     @State private var didAppear = false
-    @State private var viewport = Viewport(offset: 0, height: 0)
-    /// Window y of the timeline's visible top edge.
-    @State private var viewportTop: CGFloat = 0
+    /// Where the timeline's viewport is. Written on every scroll frame, read only by the
+    /// actions below and while a zoom runs, so scrolling never redraws the page.
+    @State private var geo = PageGeometry()
     /// The in-flight zoom/fold change, stepped frame by frame by `driver`.
     @State private var blend: ScaleBlend?
     @State private var driver = FrameDriver()
@@ -46,17 +46,21 @@ struct DayPage: View {
             ScrollView(.vertical) {
                 DayTimeline(model: model, isToday: isToday, isActive: isActive,
                             hourHeight: hourHeight, fullDay: fullDay, blend: blend, onSelect: onSelect,
-                            extraBottom: blend == nil ? 0 : viewport.height)
+                            extraBottom: blend == nil ? 0 : geo.height)
             }
             .scrollPosition($position)
             .scrollIndicators(.hidden)
             .onScrollGeometryChange(for: Viewport.self) {
                 Viewport(offset: $0.contentOffset.y, height: $0.containerSize.height)
             } action: { _, new in
-                viewport = new
-                publishAnchor()
+                geo.offset = new.offset
+                geo.height = new.height
             }
-            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { viewportTop = $0 }
+            // The pages beside follow once per gesture, not every frame: when a finger lands,
+            // when it lifts, when the scroll comes to rest. A finger landing to swipe sideways
+            // is one of those, so they are lined up before they come into view.
+            .onScrollPhaseChange { _, _ in publishAnchor() }
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { geo.top = $0 }
         }
         .background(Theme.paper)
         .onAppear {
@@ -84,21 +88,29 @@ struct DayPage: View {
 
     /// The page in view reports which hour sits a third of the way down.
     private func publishAnchor() {
-        guard isActive, didAppear, blend == nil, viewport.height > 0 else { return }
-        let lead = viewport.height / 3
-        let hour = currentScale.hour(atY: viewport.offset + lead - Theme.topInset)
-        let next = TimeAnchor(hour: hour, screenY: viewportTop + lead)
+        guard isActive, didAppear, blend == nil, geo.height > 0 else { return }
+        let lead = geo.height / 3
+        let hour = currentScale.hour(atY: geo.offset + lead - Theme.topInset)
+        let next = TimeAnchor(hour: hour, screenY: geo.top + lead)
         if next != anchor { anchor = next }
     }
 
     private func align(to a: TimeAnchor) {
-        position.scrollTo(y: max(0, currentScale.y(a.hour) + Theme.topInset - (a.screenY - viewportTop)))
+        position.scrollTo(y: max(0, currentScale.y(a.hour) + Theme.topInset - (a.screenY - geo.top)))
         didScroll = true
     }
 
     private struct Viewport: Equatable {
         let offset: CGFloat
         let height: CGFloat
+    }
+
+    /// Not observed: nothing redraws when it changes.
+    private final class PageGeometry {
+        var offset: CGFloat = 0
+        var height: CGFloat = 0
+        /// Window y of the timeline's visible top edge.
+        var top: CGFloat = 0
     }
 
     private struct Mode: Equatable {
@@ -123,11 +135,11 @@ struct DayPage: View {
             ?? ScaleFrame(DayTimeline.scale(for: model, isToday: isToday, hourHeight: old.hourHeight, fullDay: old.fullDay))
         let after = DayTimeline.scale(for: model, isToday: isToday, hourHeight: new.hourHeight, fullDay: new.fullDay)
         let target = ScaleFrame(after)
-        let lead = viewport.height / 3
-        let fromY = drivenY ?? viewport.offset
+        let lead = geo.height / 3
+        let fromY = drivenY ?? geo.offset
         let hour = before.hour(atY: fromY + lead - Theme.topInset)
         // Land inside the final content, so dropping the extra room at the end moves nothing.
-        let maxY = max(0, after.height + Theme.topInset * 2 - viewport.height)
+        let maxY = max(0, after.height + Theme.topInset * 2 - geo.height)
         let toY = min(maxY, max(0, after.y(hour) + Theme.topInset - lead))
         driver.run(onFrame: { p in
             blend = ScaleBlend(from: before, to: target, t: p)
