@@ -245,13 +245,16 @@ private struct HeaderButton: View {
     }
 }
 
-/// Gives under the finger, so a block reads as something to press.
+/// Gives under the finger, so a block reads as something to press. Only the press is
+/// animated: the release is where the date's tap closes the page, and a spring back to
+/// full size and full opacity would still be running inside the page as it zooms down
+/// into its cell.
 private struct PressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .opacity(configuration.isPressed ? 0.8 : 1)
-            .animation(.spring(duration: 0.25), value: configuration.isPressed)
+            .animation(configuration.isPressed ? .spring(duration: 0.25) : nil, value: configuration.isPressed)
     }
 }
 
