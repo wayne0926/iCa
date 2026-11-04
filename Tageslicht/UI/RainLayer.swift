@@ -357,3 +357,89 @@ struct RainLayer: View {
         return v - floor(v)
     }
 }
+
+/// Sunshine across the hours forecast clear and cloudless: a few broad, soft shafts of light
+/// falling from the upper right, drifting slowly sideways and brightening and dimming each
+/// at its own pace, over a faint lift of the whole stretch. Light, not ink: on the pale page
+/// brighter than the paper, on the black one a glow. Behind the cards only.
+///
+/// Like the rain, it has no hard box: it fades in over the stretch above its first hour and
+/// out below its last, and towards the hour labels on the left. Shafts are placed by a
+/// fixed hash and moved by the clock, nothing kept between frames; the clock runs only on
+/// the page in view (and while paging), at 30 frames a second, which slow light needs, and
+/// stops under Reduce Motion and in Low Power Mode.
+struct SunshineLayer: View {
+    /// Seeds the hash, so separate sunny stretches don't move in step.
+    let index: Int
+    let active: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+    @Environment(PagerActivity.self) private var pager: PagerActivity?
+
+    private static let shafts = 4
+    /// Horizontal run per point down: the sun stands high to the right.
+    private static let lean: CGFloat = 0.42
+
+    var body: some View {
+        let still = !(active || pager?.moving == true) || reduceMotion || lowPower
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: still)) { timeline in
+            Canvas { ctx, size in
+                draw(&ctx, size, t: timeline.date.timeIntervalSinceReferenceDate)
+            }
+        }
+        .mask {
+            GeometryReader { g in
+                // The band reaches RainLayer.margin past its hours at both ends: the light
+                // comes up over that stretch and is full across the hours themselves.
+                let m = min(0.45, RainLayer.margin * 1.5 / max(g.size.height, 1))
+                LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: m),
+                                       .init(color: .black, location: 1 - m), .init(color: .clear, location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+                    .mask {
+                        let w = min(0.4, Theme.gutter * 1.2 / max(g.size.width, 1))
+                        LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: w),
+                                               .init(color: .black, location: 1)],
+                                       startPoint: .leading, endPoint: .trailing)
+                    }
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+        .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange)
+            .receive(on: RunLoop.main)) { _ in
+            lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+        }
+    }
+
+    private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, t: Double) {
+        let light = Theme.sunlight
+        // The whole stretch a touch brighter.
+        ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(light.opacity(0.22)))
+        // Shafts drawn upright, then sheared: x moves left by `lean` per point down.
+        var c = ctx
+        c.transform = CGAffineTransform(a: 1, b: 0, c: -Self.lean, d: 1, tx: 0, ty: 0)
+        let reach = size.width + Self.lean * size.height
+        for i in 0..<Self.shafts {
+            let width = 28 + 46 * CGFloat(rand(i, 1))
+            let place = (Double(i) + 0.5) / Double(Self.shafts) + (rand(i, 2) - 0.5) * 0.18
+            let drift = 22 * sin(t * 2 * .pi / (17 + 11 * rand(i, 3)) + rand(i, 4) * 6.28)
+            let x = CGFloat(place) * reach + CGFloat(drift)
+            // Each brightens and dims at its own slow pace, never quite going out.
+            let breathe = 0.6 + 0.4 * sin(t * 2 * .pi / (7 + 5 * rand(i, 5)) + rand(i, 6) * 6.28)
+            let strength = (0.45 + 0.35 * rand(i, 7)) * breathe
+            let gradient = Gradient(stops: [.init(color: light.opacity(0), location: 0),
+                                            .init(color: light.opacity(strength), location: 0.5),
+                                            .init(color: light.opacity(0), location: 1)])
+            c.fill(Path(CGRect(x: x - width / 2, y: 0, width: width, height: size.height)),
+                   with: .linearGradient(gradient, startPoint: CGPoint(x: x - width / 2, y: 0),
+                                         endPoint: CGPoint(x: x + width / 2, y: 0)))
+        }
+    }
+
+    /// Stable pseudo-random in [0, 1) per shaft and channel.
+    private func rand(_ i: Int, _ channel: Int) -> Double {
+        let v = sin(Double(index * 7919 + i * 104_729 + channel * 1_299_709) * 12.9898) * 43758.5453
+        return v - floor(v)
+    }
+}

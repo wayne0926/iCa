@@ -52,3 +52,26 @@ struct PrecipSpan: Equatable {
         return result
     }
 }
+
+/// A run of daylight hours forecast clear and cloudless (meteoblue's "clear, cloudless" and
+/// "clear, few cirrus"; Open-Meteo's clear and mainly clear), for the sunshine on the page.
+/// An hour the radar sees rain in is not one.
+struct SunSpan: Equatable {
+    let start: Double
+    let end: Double
+
+    static func spans(from hours: [HourWeather], day: Date, radar: [RadarStep] = []) -> [SunSpan] {
+        var result: [SunSpan] = []
+        for h in hours where h.isDaylight && (1...2).contains(h.pictocode) && h.precipitation < PrecipSpan.threshold {
+            let end = h.time.addingTimeInterval(3600)
+            if radar.contains(where: { $0.rate >= PrecipSpan.threshold && $0.time > h.time && $0.start < end }) { continue }
+            let start = h.time.timeIntervalSince(day) / 3600
+            if let last = result.last, abs(last.end - start) < 0.01 {
+                result[result.count - 1] = SunSpan(start: last.start, end: start + 1)
+            } else {
+                result.append(SunSpan(start: start, end: start + 1))
+            }
+        }
+        return result
+    }
+}

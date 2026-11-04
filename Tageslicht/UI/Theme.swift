@@ -33,6 +33,11 @@ enum Theme {
     static let sunBall = Color(UIColor { t in
         t.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.12) : UIColor(white: 0, alpha: 0.06)
     })
+    /// Sunshine on the page: light, so on the pale page it is brighter than the paper and on
+    /// the black one a faint glow.
+    static let sunlight = Color(UIColor { t in
+        t.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.11) : UIColor(white: 1, alpha: 1)
+    })
     /// Rain: wet hours, and trips moved onto transit because of it.
     static let rain = dynamic(light: (0.16, 0.47, 0.84), dark: (0.40, 0.66, 0.96))
     /// Now: the current-time line and today's weekday.

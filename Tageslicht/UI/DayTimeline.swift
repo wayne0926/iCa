@@ -30,6 +30,7 @@ struct DayTimeline: View {
         let target = Self.scale(for: model, isToday: isToday, hourHeight: hourHeight, fullDay: fullDay)
         let scale = blend ?? ScaleBlend(target)
         let wet = PrecipSpan.spans(from: model.hours, day: model.day, radar: model.radar)
+        let sunny = SunSpan.spans(from: model.hours, day: model.day, radar: model.radar)
         let now = Date()
         let hours = Int(Self.dayHours(model.day).rounded())
         // Everything is a positioned view: an animation frame only moves layers, it never
@@ -61,15 +62,20 @@ struct DayTimeline: View {
                     }
                 }
             }
-            dayLayer(scale: scale, wet: wet, now: now)
+            dayLayer(scale: scale, wet: wet, sunny: sunny, now: now)
         }
         .overlay(alignment: .topLeading) {
             if isToday { NowLine(day: model.day, scale: scale) }
         }
     }
 
-    private func dayLayer(scale: ScaleBlend, wet: [PrecipSpan], now: Date) -> some View {
+    private func dayLayer(scale: ScaleBlend, wet: [PrecipSpan], sunny: [SunSpan], now: Date) -> some View {
         TimelineLayout(scale: scale, extraBottom: extraBottom) {
+            // Sunshine lies behind everything of the day.
+            ForEach(Array(sunny.enumerated()), id: \.offset) { i, span in
+                SunshineLayer(index: i, active: isActive)
+                    .layoutValue(key: Slot.self, value: .band(span.start, span.end))
+            }
             ForEach(Array(wet.enumerated()), id: \.offset) { i, span in
                 RainLayer(span: span, index: i, active: isActive, plane: .behind)
                     .layoutValue(key: Slot.self, value: .band(span.start, span.end))
