@@ -15,6 +15,11 @@ struct DayPager: View {
     /// on its first page is not a day.
     @State private var paging = PagingState()
     @State private var detail: CalEvent?
+    /// When the page came on screen, and whether it is on its way back: a tap that lands
+    /// while the zoom still runs, opening or closing, is a tap meant for the month, never
+    /// one that opens an event.
+    @State private var openedAt = Date()
+    @State private var closing = false
     /// The moment the reader is looking at, shared by every page so paging keeps hours level.
     @State private var anchor: TimeAnchor?
 
@@ -51,13 +56,21 @@ struct DayPager: View {
         VStack(spacing: 0) {
             DayHeader(model: model, isToday: shown == today, backwards: backwards, onClose: close)
             if !model.allDay.isEmpty {
-                AllDayStrip(day: shown, events: model.allDay, onSelect: { detail = $0 })
+                AllDayStrip(day: shown, events: model.allDay, onSelect: select)
                     .transition(.opacity)
             }
             Divider()
             pager
         }
         .background(Theme.paper)
+        .onAppear {
+            openedAt = Date()
+            closing = false
+        }
+        .onDisappear {
+            closing = true
+            detail = nil
+        }
         .sheet(item: $detail) { e in
             let model = store.model(for: e.start)
             EventDetailView(event: e, plan: model.travel[e.id], hours: model.hours,
@@ -71,7 +84,7 @@ struct DayPager: View {
             LazyHStack(spacing: 0) {
                 ForEach(days, id: \.self) { day in
                     DayPage(model: store.model(for: day), isToday: day == today, isActive: day == selection,
-                            anchor: $anchor, onSelect: { detail = $0 })
+                            anchor: $anchor, onSelect: select)
                         .containerRelativeFrame(.horizontal)
                 }
             }
@@ -130,8 +143,15 @@ struct DayPager: View {
     /// The date tapped before the page settled: name the day in view first, so the page
     /// closes into its cell.
     private func close() {
+        closing = true
         if let s = selection { onDayChange(s) }
         onClose()
+    }
+
+    /// The zoom takes about half a second; until it has, the page isn't the one tapped.
+    private func select(_ e: CalEvent) {
+        guard !closing, Date().timeIntervalSince(openedAt) > 0.5 else { return }
+        detail = e
     }
 
     /// Not observed: the phase changes nothing on screen by itself.

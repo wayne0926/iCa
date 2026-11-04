@@ -14,6 +14,11 @@ import SwiftUI
 /// and by fade level: a dozen strokes per frame at most. The clock only runs on the
 /// page in view, at most 60 times a second even on a 120 Hz screen, and stops under
 /// Reduce Motion and in Low Power Mode, where the shower stands still.
+///
+/// Drops have a little weight: while the page scrolls or pages, they lean against the
+/// motion, as if the air they fall through stayed behind, and settle back when it stops.
+/// Only where the shower is on screen is tracked, outside any view state, and read as a
+/// frame is drawn; the drops themselves never move for it, only their lean and length.
 struct RainLayer: View {
     enum Plane { case behind, inFront }
 
@@ -25,6 +30,7 @@ struct RainLayer: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+    @State private var motion = Motion()
 
     /// Depth planes; the last one is the near plane drawn over the cards.
     private static let depths = 4
@@ -40,24 +46,55 @@ struct RainLayer: View {
 
     var body: some View {
         // The canvas only covers this shower's hours (plus margin), never the whole day.
-        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !active || reduceMotion || lowPower)) { timeline in
+        let still = !active || reduceMotion || lowPower
+        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: still)) { timeline in
             Canvas { ctx, size in
                 let t = timeline.date.timeIntervalSinceReferenceDate
+                // A shower standing still doesn't lean either.
+                let v = still ? .zero : motion.velocity(at: t)
                 let field = Field(left: Theme.gutter * 0.5, right: size.width)
                 let planes = plane == .inFront ? (Self.depths - 1)..<Self.depths : 0..<(Self.depths - 1)
                 let band = Band(index: index, span: span, top: Self.margin, bottom: size.height - Self.margin)
                 guard band.bottom - band.top > 6 else { return }
                 if span.snow {
-                    drawSnow(&ctx, band, field, planes: planes, t: t)
+                    drawSnow(&ctx, band, field, planes: planes, t: t, v: v)
                 } else {
-                    drawRain(&ctx, band, field, planes: planes, t: t)
+                    drawRain(&ctx, band, field, planes: planes, t: t, v: v)
                 }
             }
         }
         .allowsHitTesting(false)
+        .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { motion.origin = $0 }
         .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange)
             .receive(on: RunLoop.main)) { _ in
             lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+        }
+    }
+
+    /// Where the shower sits on screen and how fast it has been moving there. Written as
+    /// the page moves, read as a frame is drawn; not observed, so it redraws nothing.
+    private final class Motion {
+        var origin: CGPoint = .zero
+        private var last: CGPoint?
+        private var lastTime: Double = 0
+        private var v: CGVector = .zero
+
+        /// Screen velocity in pt/s, eased so a flick builds the lean over a tenth of a
+        /// second and lets it go the same way.
+        func velocity(at t: Double) -> CGVector {
+            guard t > lastTime else { return v }
+            let dt = t - lastTime
+            defer { last = origin; lastTime = t }
+            // First frame, or back after a pause: nothing to compare with.
+            guard let prev = last, dt < 0.1 else { v = .zero; return v }
+            let cap: CGFloat = 4000
+            let raw = CGVector(dx: max(-cap, min(cap, (origin.x - prev.x) / dt)),
+                               dy: max(-cap, min(cap, (origin.y - prev.y) / dt)))
+            let k = CGFloat(1 - exp(-dt / 0.12))
+            v.dx += (raw.dx - v.dx) * k
+            v.dy += (raw.dy - v.dy) * k
+            if abs(v.dx) < 1 && abs(v.dy) < 1 { v = .zero }
+            return v
         }
     }
 
@@ -119,7 +156,8 @@ struct RainLayer: View {
     /// Each drop lives briefly: it appears somewhere in the shower, falls a short way and
     /// fades, then comes back elsewhere after a random pause. No conveyor belt of streaks
     /// looping top to bottom; the wind's lean drifts slowly too.
-    private func drawRain(_ ctx: inout GraphicsContext, _ b: Band, _ f: Field, planes: Range<Int>, t: Double) {
+    private func drawRain(_ ctx: inout GraphicsContext, _ b: Band, _ f: Field, planes: Range<Int>,
+                          t: Double, v: CGVector) {
         let height = b.bottom - b.top
         let area = Double(f.width * (height + Self.wander))
         // About 60 % of drops are visible at any moment; budget for that.
@@ -127,6 +165,12 @@ struct RainLayer: View {
         let gust = 1 + 0.35 * sin(t * 0.45 + Double(b.index)) * sin(t * 0.17)
         let slant = Self.slant(b.span.wind) * CGFloat(gust)
         let baseSpeed = Self.speed(b.span.intensity)
+        // The lean: the drop's way through the page is its fall less the page's motion,
+        // a small share of it, held to a gentle tilt. Paging sideways tips the drops; a
+        // page moving up stretches them a little, moving down shortens them.
+        let share: CGFloat = 0.03
+        let lean = slant + max(-0.3, min(0.3, share * v.dx / CGFloat(baseSpeed)))
+        let stretch = 1 + max(-0.3, min(0.45, -share * v.dy / CGFloat(baseSpeed)))
         var paths = Array(repeating: Path(), count: Self.depths * Self.fades)
         for i in 0..<count {
             let depth = min(Self.depths - 1, Int(rand(b.index, i, 6) * Double(Self.depths)))
@@ -141,7 +185,7 @@ struct RainLayer: View {
             let c = Int(cycle.truncatingRemainder(dividingBy: 9973))
             // A fresh place every appearance.
             let speed = baseSpeed * (0.55 + 0.6 * near) * (0.85 + 0.3 * cycleRand(b.index, i, c, 2))
-            let length = CGFloat(6 + 7 * near) * CGFloat(0.8 + 0.4 * cycleRand(b.index, i, c, 7))
+            let length = CGFloat(6 + 7 * near) * CGFloat(0.8 + 0.4 * cycleRand(b.index, i, c, 7)) * stretch
             let y0 = b.top - Self.wander * 0.5 + CGFloat(cycleRand(b.index, i, c, 5)) * (height + Self.wander)
             let fall = CGFloat(speed * local)
             let y = y0 + fall
@@ -152,7 +196,7 @@ struct RainLayer: View {
             guard let level = fadeLevel(life01 * edge * f.fade(x)) else { continue }
             let k = depth * Self.fades + level
             paths[k].move(to: CGPoint(x: x, y: y))
-            paths[k].addLine(to: CGPoint(x: x - length * slant, y: y + length))
+            paths[k].addLine(to: CGPoint(x: x - length * lean, y: y + length))
         }
         for depth in planes {
             let near = (Double(depth) + 0.5) / Double(Self.depths)
@@ -167,7 +211,8 @@ struct RainLayer: View {
 
     // MARK: Snow
 
-    private func drawSnow(_ ctx: inout GraphicsContext, _ b: Band, _ f: Field, planes: Range<Int>, t: Double) {
+    private func drawSnow(_ ctx: inout GraphicsContext, _ b: Band, _ f: Field, planes: Range<Int>,
+                          t: Double, v: CGVector) {
         let area = Double(f.width * (b.bottom - b.top + Self.wander))
         let count = min(Self.maxDropsPerSpan, Int(area / 1000 * 0.5))
         var paths = Array(repeating: Path(), count: Self.depths * Self.fades)
@@ -180,8 +225,12 @@ struct RainLayer: View {
             let (top, bottom) = run(b, i)
             let travel = Double(bottom - top + r * 2)
             let y = top - r + CGFloat((rand(b.index, i, 3) * travel + t * speed).truncatingRemainder(dividingBy: travel))
+                + max(-8, min(8, -v.dy * CGFloat(0.003 + 0.003 * near)))
             let sway = CGFloat(4 + 4 * near) * CGFloat(sin(t * 1.1 + rand(b.index, i, 5) * 6.28))
+            // Flakes are light: they drift back against the motion, the near ones more.
+            let drag = CGFloat(0.004 + 0.004 * near)
             let x = f.left + CGFloat(rand(b.index, i, 4)) * f.width + sway
+                + max(-10, min(10, -v.dx * drag))
             let vertical = min(1, max(0, min(y + r - top, bottom - y) / Self.fadeLength))
             guard let level = fadeLevel(vertical * f.fade(x)) else { continue }
             paths[depth * Self.fades + level].addEllipse(in: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2))
