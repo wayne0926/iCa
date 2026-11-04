@@ -293,14 +293,21 @@ private struct WeatherGlyph: View {
         }
     }
 
-    /// How far the rain reaches below the cloud; 0 is none.
+    /// How long the drops are. Kept when there is no rain, so they slide up into the cloud
+    /// whole rather than shrinking to dots.
     private var drops: CGFloat {
         switch kind {
         case .drizzle: return 2.5
-        case .rain, .showers: return 5.5
         case .heavyRain: return 7.5
         case .sleet: return 3.5
-        default: return 0
+        default: return 5.5
+        }
+    }
+
+    private var raining: Bool {
+        switch kind {
+        case .drizzle, .rain, .showers, .heavyRain, .sleet: return true
+        default: return false
         }
     }
 
@@ -319,7 +326,7 @@ private struct WeatherGlyph: View {
         let fog: CGFloat = kind == .fog ? 1 : 0
         let bolt = kind == .thunder
         // Anything under the cloud: it rises and narrows a little to make room.
-        let under = drops > 0 || flakes.1 > 0 || fog > 0 || bolt
+        let under = raining || flakes.1 > 0 || fog > 0 || bolt
         let place = CloudPlace(shown: shown, peek: peek, under: under)
         ZStack {
             Image(systemName: "sun.max")
@@ -327,28 +334,32 @@ private struct WeatherGlyph: View {
                 .offset(x: sun == .full ? 0 : peek ? 5 : 3,
                         y: sun == .full ? 0 : peek ? (under ? -6 : -4) : -2)
                 .opacity(sun == .gone ? 0 : 1)
-            // The cloud's shape, a little larger, cut out of the sun behind it: the cloud reads
-            // as in front, with a sliver of air between them, on any background.
+            // What falls from the cloud hangs from it: it moves with the cloud, and leaves by
+            // going back up into it.
+            Group {
+                Drops(length: drops, out: raining ? 1 : 0)
+                    .stroke(style: Self.stroke)
+                    .opacity(raining ? 1 : 0)
+                Flakes(rows: AnimatablePair(flakes.0, flakes.1))
+                Mist(amount: fog)
+                    .stroke(style: Self.stroke)
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .scaleEffect(bolt ? 1 : 0.5, anchor: .top)
+                    .offset(y: bolt ? 8 : 2)
+                    .opacity(bolt ? 1 : 0)
+            }
+            .frame(width: Self.size.width, height: Self.size.height)
+            .offset(x: place.x, y: place.y + CloudPlace.rise)
+            // The cloud's shape, a little larger, cut out of the sun and of whatever falls
+            // behind it: the cloud reads as in front, with a sliver of air around it, on any
+            // background, and drops going back up vanish into it.
             Image(systemName: "cloud.fill")
                 .scaleEffect(1.14)
                 .blendMode(.destinationOut)
                 .modifier(place)
             Image(systemName: "cloud")
                 .modifier(place)
-            Group {
-                Drops(length: drops)
-                    .stroke(style: Self.stroke)
-                Flakes(rows: AnimatablePair(flakes.0, flakes.1))
-                Mist(amount: fog)
-                    .stroke(style: Self.stroke)
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 10, weight: .semibold))
-                    .scaleEffect(bolt ? 1 : 0.3, anchor: .top)
-                    .offset(y: 8)
-                    .opacity(bolt ? 1 : 0)
-            }
-            .frame(width: Self.size.width, height: Self.size.height)
-            .offset(x: place.x)
         }
         .compositingGroup()
         .font(.system(size: 17, weight: .semibold))
@@ -367,8 +378,11 @@ private struct WeatherGlyph: View {
         let peek: Bool
         let under: Bool
 
+        /// How far the cloud rises to make room underneath.
+        static let rise: CGFloat = 5
+
         var x: CGFloat { !shown ? -10 : peek ? -2 : 0 }
-        var y: CGFloat { !shown ? 3 : (peek ? 2 : 0) - (under ? 5 : 0) }
+        var y: CGFloat { !shown ? 3 : (peek ? 2 : 0) - (under ? Self.rise : 0) }
         var scale: CGFloat { (!shown ? 0.8 : peek ? 0.88 : 1) * (under ? 0.9 : 1) }
 
         func body(content: Content) -> some View {
@@ -379,24 +393,26 @@ private struct WeatherGlyph: View {
         }
     }
 
-    /// Where precipitation starts: just under the raised cloud.
+    /// Where precipitation starts: just under the cloud, risen to make room.
     private static let underside: CGFloat = 16.5
 
-    /// Three short slanted strokes, the middle one a little lower, growing out of the
-    /// cloud's underside; at length 0 there is nothing.
+    /// Three short slanted strokes, the middle one a little lower. `out` 1 hangs them under
+    /// the cloud; towards 0 they slide whole back up into it, where the cloud's cut-out
+    /// hides them. Never shortened to nothing, so never left as dots.
     private struct Drops: Shape {
         var length: CGFloat
-        var animatableData: CGFloat {
-            get { length }
-            set { length = newValue }
+        var out: CGFloat
+        var animatableData: AnimatablePair<CGFloat, CGFloat> {
+            get { AnimatablePair(length, out) }
+            set { length = newValue.first; out = newValue.second }
         }
 
         func path(in r: CGRect) -> Path {
             var p = Path()
-            guard length > 0.1 else { return p }
+            let back = (length + 3) * (1 - out)
             for i in 0..<3 {
-                let x = r.midX + CGFloat(i - 1) * 5.5 + 1
-                let top = r.minY + WeatherGlyph.underside + (i == 1 ? 1.5 : 0)
+                let x = r.midX + CGFloat(i - 1) * 5.5 + 1 + back * 0.35
+                let top = r.minY + WeatherGlyph.underside + (i == 1 ? 1.5 : 0) - back
                 p.move(to: CGPoint(x: x, y: top))
                 p.addLine(to: CGPoint(x: x - length * 0.35, y: top + length))
             }
