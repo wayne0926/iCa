@@ -52,6 +52,9 @@ struct SettingsView: View {
                 }
                 Section {
                     LabeledContent("版本", value: Self.version)
+                    // Whether the widget can get the app's weather and settings: the App Group
+                    // is in force only when the build carries it and the signing kept it.
+                    LabeledContent("小组件数据共享", value: AppGroup.identifier == nil ? "未连通" : "已连通")
                 }
             }
             .navigationTitle("设置")

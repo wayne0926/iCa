@@ -1,3 +1,4 @@
+import CoreLocation
 import EventKit
 import SwiftUI
 import WidgetKit
@@ -17,7 +18,7 @@ struct TimelineWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: Self.kind, provider: Provider()) { entry in
             TimelineWidgetView(entry: entry)
-                .containerBackground(for: .widget) { Color(.systemGroupedBackground) }
+                .containerBackground(for: .widget) { Ink.paper }
         }
         .configurationDisplayName("时间线")
         .description("接下来几个小时的日程；今天的结束后，显示明天的。")
@@ -68,12 +69,72 @@ struct Agenda {
     }
 }
 
+extension Agenda {
+    /// As `load`, and when the app has left no weather (its App Group not in force), the
+    /// widget asks Open-Meteo itself, for where the phone last was.
+    static func loadWithWeather(from today: Date) async -> Agenda {
+        var agenda = load(from: today)
+        if agenda.symbols.isEmpty, let place = CLLocationManager().location?.coordinate {
+            agenda.symbols = await OpenMeteo.symbols(lat: place.latitude, lon: place.longitude)
+        }
+        return agenda
+    }
+}
+
+/// The widget's own weather, only when the app's is missing: Open-Meteo's daily weather
+/// code for the next three days, as the outline symbol the app would show.
+enum OpenMeteo {
+    static func symbols(lat: Double, lon: Double) async -> [Date: String] {
+        var comps = URLComponents(string: "https://api.open-meteo.com/v1/forecast")!
+        comps.queryItems = [
+            .init(name: "latitude", value: String(lat)),
+            .init(name: "longitude", value: String(lon)),
+            .init(name: "daily", value: "weather_code"),
+            .init(name: "forecast_days", value: "3"),
+            .init(name: "timezone", value: TimeZone.current.identifier),
+        ]
+        struct Payload: Decodable {
+            struct Daily: Decodable { let time: [String]; let weather_code: [Int?] }
+            let daily: Daily
+        }
+        guard let url = comps.url, let answer = try? await URLSession.shared.data(from: url),
+              let p = try? JSONDecoder().decode(Payload.self, from: answer.0) else { return [:] }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = .current
+        f.dateFormat = "yyyy-MM-dd"
+        var result: [Date: String] = [:]
+        for (i, t) in p.daily.time.enumerated() where i < p.daily.weather_code.count {
+            guard let d = f.date(from: t), let code = p.daily.weather_code[i] else { continue }
+            result[Calendar.current.startOfDay(for: d)] = symbol(wmo: code)
+        }
+        return result
+    }
+
+    static func symbol(wmo: Int) -> String {
+        switch wmo {
+        case 0, 1: return "sun.max"
+        case 2: return "cloud.sun"
+        case 45, 48: return "cloud.fog"
+        case 51...57: return "cloud.drizzle"
+        case 61, 63: return "cloud.rain"
+        case 65, 82: return "cloud.heavyrain"
+        case 66, 67: return "cloud.sleet"
+        case 71...77, 85, 86: return "cloud.snow"
+        case 80, 81: return "cloud.sun.rain"
+        case 95...99: return "cloud.bolt.rain"
+        default: return "cloud"
+        }
+    }
+}
+
 /// Which day and which hours to show at a moment, and what is in them.
 ///
-/// - Today, while anything is still to come: from just before now, three and a half hours.
-///   A long free stretch before the next event is skipped: the window opens an hour before
-///   it, so the next event is always in view.
-/// - Once today's last event is over: tomorrow, from just before its first event.
+/// - Today, while anything is still to come: from the hour now is in, three and a half
+///   hours. More than an hour and a half free before the next event is skipped: the window
+///   opens on the hour half an hour before it, so the next event is in view, whole as far
+///   as it fits.
+/// - Once today's last event is over: tomorrow, from the hour its first event starts in.
 /// - Nothing either day: the day it is (or tomorrow, from the evening on), empty.
 struct Plan {
     let day: Date
@@ -103,14 +164,14 @@ struct Plan {
         let todays = on(today, until: tomorrow)
         if let next = todays.first(where: { $0.end > now }) {
             let nowH = hours(now, from: today)
-            var from = (nowH - 0.25).rounded(.down)
+            var from = nowH.rounded(.down)
             let nextH = hours(next.start, from: today)
-            if nextH > nowH + window - 1 { from = (nextH - 1).rounded(.down) }
+            if nextH > nowH + 1.5 { from = (nextH - 0.5).rounded(.down) }
             return plan(today, isToday: true, from: from, events: todays)
         }
         let tomorrows = on(tomorrow, until: dayAfter)
         if let first = tomorrows.first {
-            let from = (max(0, hours(first.start, from: tomorrow)) - 0.25).rounded(.down)
+            let from = max(0, hours(first.start, from: tomorrow)).rounded(.down)
             return plan(tomorrow, isToday: false, from: from, events: tomorrows)
         }
         let evening = calendar.component(.hour, from: now) >= 18
@@ -124,29 +185,38 @@ struct Provider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (Entry) -> Void) {
-        let now = Date()
-        completion(Entry(date: now, plan: Plan.make(at: now, agenda: Agenda.load(from: Calendar.current.startOfDay(for: now)))))
+        Task {
+            let now = Date()
+            let agenda = await Agenda.loadWithWeather(from: Calendar.current.startOfDay(for: now))
+            completion(Entry(date: now, plan: Plan.make(at: now, agenda: agenda)))
+        }
     }
 
     /// Every quarter hour for three hours, so the red line moves and the window follows,
     /// plus each moment an event starts or ends; then the calendar is read again.
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
-        let now = Date()
-        let agenda = Agenda.load(from: Calendar.current.startOfDay(for: now))
-        let until = now.addingTimeInterval(3 * 3600)
-        var dates = stride(from: 0.0, to: 3 * 3600, by: 15 * 60).map { now.addingTimeInterval($0) }
-        for e in agenda.events {
-            for t in [e.start, e.end] where t > now && t < until { dates.append(t) }
+        Task {
+            let now = Date()
+            let agenda = await Agenda.loadWithWeather(from: Calendar.current.startOfDay(for: now))
+            let until = now.addingTimeInterval(3 * 3600)
+            var dates = stride(from: 0.0, to: 3 * 3600, by: 15 * 60).map { now.addingTimeInterval($0) }
+            for e in agenda.events {
+                for t in [e.start, e.end] where t > now && t < until { dates.append(t) }
+            }
+            let entries = dates.sorted().map { Entry(date: $0, plan: Plan.make(at: $0, agenda: agenda)) }
+            completion(Timeline(entries: entries, policy: .atEnd))
         }
-        let entries = dates.sorted().map { Entry(date: $0, plan: Plan.make(at: $0, agenda: agenda)) }
-        completion(Timeline(entries: entries, policy: .atEnd))
     }
 }
 
 // MARK: - Look
 
 /// The app's palette, for the widget: the same neutrals and calendar colours (see Theme).
-private enum Ink {
+enum Ink {
+    /// The app's page: the pale grey of the light page, black on the dark one.
+    static let paper = Color(UIColor { t in
+        t.userInterfaceStyle == .dark ? .black : UIColor(red: 0.949, green: 0.949, blue: 0.969, alpha: 1)
+    })
     static let graphite = Color(.label).opacity(0.62)
     static let hairline = Color(.label).opacity(0.16)
     static let hourInk = Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.72) : .label })
@@ -251,8 +321,8 @@ private struct MiniTimeline: View {
                     let top = y(p.from), bottom = y(p.to)
                     let width = (g.size.width - Self.gutter - 4) / CGFloat(p.columns)
                     Block(event: p.event, height: bottom - top, past: p.event.end <= now)
-                        .frame(width: width - (p.columns > 1 ? 2 : 0), height: max(0, bottom - top - 2))
-                        .offset(x: Self.gutter + 4 + CGFloat(p.column) * width, y: top + 1)
+                        .frame(width: width - (p.columns > 1 ? 3 : 0), height: max(0, bottom - top - 3))
+                        .offset(x: Self.gutter + 4 + CGFloat(p.column) * width, y: top + 1.5)
                 }
                 if plan.isToday {
                     let h = now.timeIntervalSince(plan.day) / 3600
