@@ -39,10 +39,11 @@ enum Theme {
         t.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.2) : UIColor(white: 1, alpha: 1)
     })
     /// Under the sunshine on the pale page, where light alone hardly shows on the near-white
-    /// paper: the stretch dims a little, as in the shade of leaves, so the spots of light
-    /// stand out. Nothing on the black page, where the light shows by itself.
+    /// paper: a soft patch of shade around each cluster of light, as under leaves, so the
+    /// spots stand out. Its deepest, at a patch's middle. Nothing on the black page, where
+    /// the light shows by itself.
     static let sunShade = Color(UIColor { t in
-        t.userInterfaceStyle == .dark ? .clear : UIColor(white: 0, alpha: 0.08)
+        t.userInterfaceStyle == .dark ? .clear : UIColor(white: 0, alpha: 0.09)
     })
     /// Rain: wet hours, and trips moved onto transit because of it.
     static let rain = dynamic(light: (0.16, 0.47, 0.84), dark: (0.40, 0.66, 0.96))

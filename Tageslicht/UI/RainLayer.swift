@@ -360,9 +360,9 @@ struct RainLayer: View {
 
 /// Sunshine across the hours forecast clear and cloudless, as light falls through leaves:
 /// clusters of soft, slightly wide spots of light that sway a few points in a breeze and
-/// brighten and dim, each at its own pace. Light, not ink: on the pale page the stretch
-/// dims a little first, so the spots stand out brighter than the paper; on the black page
-/// they glow by themselves. Behind the cards only.
+/// brighten and dim, each at its own pace. Light, not ink: on the pale page each cluster
+/// lies in a soft patch of shade of its own, so the spots stand out brighter than the
+/// paper; on the black page they glow by themselves. Behind the cards only.
 ///
 /// Like the rain, no hard box: it fades in over the stretch above its first hour and out
 /// below its last, and towards the hour labels. Placed by a fixed hash and moved by the
@@ -417,11 +417,21 @@ struct SunshineLayer: View {
 
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, t: Double) {
         let light = Theme.sunlight
-        ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Theme.sunShade))
         let clusters = max(2, Int(size.height / Self.pitch))
         for c in 0..<clusters {
             let cx = Theme.gutter + CGFloat(rand(c, 21)) * (size.width - Theme.gutter)
             let cy = (CGFloat(c) + 0.5) / CGFloat(clusters) * size.height + CGFloat(rand(c, 22) - 0.5) * 60
+            // Each cluster brings its own patch of shade (pale page only), deepest at its
+            // middle and gone by its edge: no stretch of the page is tinted as a block, so
+            // there is no edge to see, not even while a page slides past.
+            let halo = Gradient(stops: [.init(color: Theme.sunShade, location: 0),
+                                        .init(color: Theme.sunShade.opacity(0.5), location: 0.45),
+                                        .init(color: Theme.sunShade.opacity(0), location: 1)])
+            var h = ctx
+            h.translateBy(x: cx, y: cy)
+            h.scaleBy(x: 1.5, y: 1)
+            h.fill(Path(ellipseIn: CGRect(x: -115, y: -115, width: 230, height: 230)),
+                   with: .radialGradient(halo, center: .zero, startRadius: 0, endRadius: 115))
             for j in 0..<Self.spotsPerCluster {
                 let i = c * 16 + j
                 let r = CGFloat(7 + 15 * rand(i, 1))
