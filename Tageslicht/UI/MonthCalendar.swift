@@ -29,25 +29,23 @@ struct MonthShape {
 /// system; pinching in from dots, or tapping the year, goes back to the year.
 struct MonthCalendar: View {
     @Environment(AppStore.self) private var store
-    /// Set by the root to bring a month into view; cleared once done.
-    @Binding var jump: Date?
-    /// The day the day page shows; its cell is where that page zooms from and back into.
-    let shown: Date?
+    /// Where the zoom sources are: told which month is at the top, and which day the day
+    /// pages show.
+    let marks: ZoomMarks
     let zoom: Namespace.ID
-    /// Told which month is at the top, so the year view can zoom back into it.
-    let onVisibleMonth: (Date) -> Void
-    let onYear: () -> Void
+    /// Back to the year, with the month at the top.
+    let onYear: (Date) -> Void
     let onOpen: (Date) -> Void
 
-    /// The zoom source id carried by the shown day's cell.
-    static let shownSource = ZoomKey.shownDay
 
     @AppStorage("monthDetailed") private var detailed = true
     @AppStorage(MonthColorStyle.key) private var colorStyle = MonthColorStyle.dot
     /// One switch per pinch.
     @State private var pinchUsed = false
     @State private var position: ScrollPosition
-    @State private var visible: Date
+    /// The month at the top. Only the year title and the today button read it, so a new
+    /// month scrolling in never redraws the list.
+    @State private var cursor: MonthCursor
     private let start: Date
 
     static let calendar = Calendar.current
@@ -58,34 +56,22 @@ struct MonthCalendar: View {
     }
     private let today = Calendar.current.startOfDay(for: Date())
 
-    init(start: Date, jump: Binding<Date?>, shown: Date?, zoom: Namespace.ID,
-         onVisibleMonth: @escaping (Date) -> Void, onYear: @escaping () -> Void, onOpen: @escaping (Date) -> Void) {
+    init(start: Date, marks: ZoomMarks, zoom: Namespace.ID,
+         onYear: @escaping (Date) -> Void, onOpen: @escaping (Date) -> Void) {
         self.start = start
-        _jump = jump
-        self.shown = shown
+        self.marks = marks
         self.zoom = zoom
-        self.onVisibleMonth = onVisibleMonth
         self.onYear = onYear
         self.onOpen = onOpen
         _position = State(initialValue: ScrollPosition(id: MonthRowID(month: start, week: -1), anchor: .top))
-        _visible = State(initialValue: start)
+        _cursor = State(initialValue: MonthCursor(visible: start))
     }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 // The year is the way back to the year view, as the date is on a day page.
-                Button(action: onYear) {
-                    Text(Self.yearTitle(Self.calendar.component(.year, from: visible)))
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Theme.ink)
-                        .contentTransition(.numericText())
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Theme.ink.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("年历")
+                YearButton(cursor: cursor) { onYear(cursor.visible) }
                 Spacer(minLength: 0)
                 SettingsButton()
             }
@@ -103,7 +89,7 @@ struct MonthCalendar: View {
                             .id(MonthRowID(month: shape.month, week: -1))
                         ForEach(shape.weeks.indices, id: \.self) { w in
                             WeekRow(month: shape.month, week: shape.weeks[w], today: today, detailed: detailed,
-                                    shown: shown, zoom: zoom, onOpen: onOpen)
+                                    marks: marks, zoom: zoom, onOpen: onOpen)
                                 .id(MonthRowID(month: shape.month, week: w))
                         }
                     }
@@ -112,9 +98,9 @@ struct MonthCalendar: View {
             }
             .scrollPosition($position, anchor: .top)
             .onScrollTargetVisibilityChange(idType: MonthRowID.self) { ids in
-                if let top = ids.min(by: { ($0.month, $0.week) < ($1.month, $1.week) }), top.month != visible {
-                    visible = top.month
-                    onVisibleMonth(top.month)
+                if let top = ids.min(by: { ($0.month, $0.week) < ($1.month, $1.week) }), top.month != cursor.visible {
+                    cursor.visible = top.month
+                    marks.month = top.month
                 }
             }
             .scrollIndicators(.hidden)
@@ -122,14 +108,8 @@ struct MonthCalendar: View {
         }
         .environment(\.monthColorStyle, colorStyle)
         .background(Theme.paper)
-        .overlay(alignment: .bottomTrailing) { todayButton }
-        .onChange(of: jump) { _, month in
-            guard let month else { return }
-            if month != visible {
-                position.scrollTo(id: MonthRowID(month: month, week: -1), anchor: .top)
-            }
-            jump = nil
-        }
+        .background { FollowJump(marks: marks, cursor: cursor, position: $position) }
+        .overlay(alignment: .bottomTrailing) { TodayButton(cursor: cursor, position: $position) }
     }
 
     static func yearTitle(_ year: Int) -> String { "\(String(year))年" }
@@ -148,20 +128,69 @@ struct MonthCalendar: View {
                     withAnimation(.smooth) { detailed = false }
                 } else if v.magnification < 0.75, !detailed {
                     pinchUsed = true
-                    onYear()
+                    onYear(cursor.visible)
                 }
             }
             .onEnded { _ in pinchUsed = false }
     }
+}
 
-    @ViewBuilder private var todayButton: some View {
-        if visible != Self.thisMonth {
+/// The month at the top of the month view.
+@MainActor
+@Observable
+private final class MonthCursor {
+    var visible: Date
+    init(visible: Date) { self.visible = visible }
+}
+
+/// The day pages paged into another month: bring it to the top while they are still open,
+/// so its cell is on screen when they close into it. Its own view, so watching for that
+/// redraws nothing else.
+private struct FollowJump: View {
+    let marks: ZoomMarks
+    let cursor: MonthCursor
+    @Binding var position: ScrollPosition
+
+    var body: some View {
+        Color.clear.onChange(of: marks.jump) { _, month in
+            guard let month, month != cursor.visible else { return }
+            position.scrollTo(id: MonthRowID(month: month, week: -1), anchor: .top)
+        }
+    }
+}
+
+/// The year, as the way back to the year view, as the date is on a day page.
+private struct YearButton: View {
+    let cursor: MonthCursor
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(MonthCalendar.yearTitle(MonthCalendar.calendar.component(.year, from: cursor.visible)))
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(Theme.ink)
+                .contentTransition(.numericText())
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Theme.ink.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("年历")
+    }
+}
+
+private struct TodayButton: View {
+    let cursor: MonthCursor
+    @Binding var position: ScrollPosition
+
+    var body: some View {
+        if cursor.visible != MonthCalendar.thisMonth {
             Button {
                 withAnimation(.snappy) {
-                    position.scrollTo(id: MonthRowID(month: Self.thisMonth, week: -1), anchor: .top)
+                    position.scrollTo(id: MonthRowID(month: MonthCalendar.thisMonth, week: -1), anchor: .top)
                 }
             } label: {
-                Label("今天", systemImage: visible > Self.thisMonth ? "chevron.up" : "chevron.down")
+                Label("今天", systemImage: cursor.visible > MonthCalendar.thisMonth ? "chevron.up" : "chevron.down")
                     .font(.system(size: 13, weight: .semibold))
                     .labelStyle(CompactLabelStyle())
                     .padding(.horizontal, 14)
@@ -255,7 +284,7 @@ private struct WeekRow: View {
     let week: [Date?]
     let today: Date
     let detailed: Bool
-    let shown: Date?
+    let marks: ZoomMarks
     let zoom: Namespace.ID
     let onOpen: (Date) -> Void
 
@@ -288,12 +317,7 @@ private struct WeekRow: View {
                         DayCell(day: day, isToday: day == today, items: items[day] ?? [], lanes: lanes, detailed: detailed)
                             .contentShape(Rectangle())
                             .onTapGesture { onOpen(day) }
-                            // The zoom runs from an empty frame, not a picture of the cell: the
-                            // page alone grows and shrinks, the cell never blows up over it.
-                            .background {
-                                Color.zoomSource
-                                    .matchedTransitionSource(id: day == shown ? MonthCalendar.shownSource : .day(day), in: zoom)
-                            }
+                            .background { ZoomSource(kind: .day, date: day, marks: marks, zoom: zoom) }
                     }
                 }
                 // Several-day events run across the week as one bar, under the day numbers.

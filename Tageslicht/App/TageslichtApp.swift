@@ -143,6 +143,41 @@ private struct ZoomProbe: View {
 }
 #endif
 
+/// Which day cell and which small month carry the zoom source. Each page zooms with one
+/// fixed source id, and the id moves: to what was tapped before the page opens, and to what
+/// the page shows now as it pages or scrolls, so it closes into that. Only the small
+/// `ZoomSource` frames read it, so moving it never redraws the grids around them.
+@MainActor
+@Observable
+final class ZoomMarks {
+    /// The day the day pages show.
+    var day: Date?
+    /// The month at the top of the month view.
+    var month = MonthCalendar.thisMonth
+    /// Paged into another month: the month view brings it to the top, so the cell is on
+    /// screen to close into.
+    var jump: Date?
+}
+
+/// The frame behind a day cell or a small month that the zoom runs from: not a picture of
+/// the cell, so the page alone grows and shrinks. It carries the shared id while its date
+/// is the shown one, its own otherwise.
+struct ZoomSource: View {
+    enum Kind: Hashable { case day, month }
+
+    let kind: Kind
+    let date: Date
+    let marks: ZoomMarks
+    let zoom: Namespace.ID
+
+    var body: some View {
+        let id: ZoomKey = kind == .day
+            ? (marks.day == date ? .shownDay : .day(date))
+            : (marks.month == date ? .shownMonth : .month(date))
+        Color.zoomSource.matchedTransitionSource(id: id, in: zoom)
+    }
+}
+
 /// Year → months → day, each opening out of the one below with the system zoom, as in
 /// iOS Calendar. The app starts on the months (or the year, if that's where it was left).
 private struct CalendarRoot: View {
@@ -152,11 +187,9 @@ private struct CalendarRoot: View {
     }
 
     @State private var path: [Route]
-    @State private var jump: Date?
-    /// The month the month view shows, and the day the day pages show; their small copies
-    /// below carry the zoom sources.
+    /// The month the year view should have on screen when the months close into it.
     @State private var shownMonth = MonthCalendar.thisMonth
-    @State private var shownDay: Date?
+    @State private var marks = ZoomMarks()
     @Namespace private var zoom
     @AppStorage("showYear") private var showYear = false
 
@@ -167,37 +200,55 @@ private struct CalendarRoot: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            YearCalendar(shownMonth: shownMonth, zoom: zoom) { month in
+            YearCalendar(shownMonth: shownMonth, marks: marks, zoom: zoom) { month in
                 // The source moves first; the page opens a pass later, so the zoom starts
                 // from what was tapped.
                 shownMonth = month
+                marks.month = month
                 DispatchQueue.main.async { path = [.month(month)] }
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .month(let month):
-                    MonthCalendar(start: month, jump: $jump, shown: shownDay, zoom: zoom,
-                                  onVisibleMonth: { shownMonth = $0 },
-                                  onYear: { path.removeAll() }) { day in
-                        shownDay = day
+                    MonthCalendar(start: month, marks: marks, zoom: zoom,
+                                  onYear: { visible in
+                                      // The year view brings that year on screen, then the
+                                      // months close into its small copy.
+                                      shownMonth = visible
+                                      marks.month = visible
+                                      DispatchQueue.main.async { path.removeAll() }
+                                  }) { day in
+                        marks.jump = nil
+                        marks.day = day
                         DispatchQueue.main.async { path.append(.day(day)) }
                     }
+                    // No `.id` here, as in 0.8.8: both zooms run through this page, and the
+                    // stack never swaps one month page for another.
                     .toolbar(.hidden, for: .navigationBar)
-                    .navigationTransition(.zoom(sourceID: YearCalendar.shownSource, in: zoom))
+                    // Outermost, with a fixed id: the source is what moves.
+                    .navigationTransition(.zoom(sourceID: ZoomKey.shownMonth, in: zoom))
                 case .day(let day):
-                    DayPager(start: day, onDayChange: { now in
-                        shownDay = now
-                        // Paged into another month: going back lands on that month.
-                        jump = MonthCalendar.calendar.dateInterval(of: .month, for: now)?.start
+                    // Paging moves the source with it; crossing into another month also
+                    // brings that month to the top of the month view behind.
+                    DayPager(start: day, onDayChange: { [marks] now in
+                        guard now != marks.day else { return }
+                        let before = marks.day.map(Self.monthStart)
+                        marks.day = now
+                        let month = Self.monthStart(now)
+                        if month != before { marks.jump = month }
                     }, onClose: { if !path.isEmpty { path.removeLast() } })
                     .toolbar(.hidden, for: .navigationBar)
-                    .navigationTransition(.zoom(sourceID: MonthCalendar.shownSource, in: zoom))
+                    .navigationTransition(.zoom(sourceID: ZoomKey.shownDay, in: zoom))
                 }
             }
         }
         .tint(Theme.ink)
         .onChange(of: path.isEmpty) { _, atYear in showYear = atYear }
+    }
+
+    private static func monthStart(_ day: Date) -> Date {
+        MonthCalendar.calendar.dateInterval(of: .month, for: day)?.start ?? day
     }
 }
 

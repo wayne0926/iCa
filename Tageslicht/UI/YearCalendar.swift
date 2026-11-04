@@ -3,18 +3,18 @@ import SwiftUI
 /// The year view, under the months like in iOS Calendar: twelve small months a year.
 /// A month opens with the system zoom out of its small copy, and zooms back into it.
 struct YearCalendar: View {
-    /// The month the month view shows; its small copy carries the zoom source.
+    /// The month the month view closes back to; the year view brings its year on screen.
     let shownMonth: Date
+    let marks: ZoomMarks
     let zoom: Namespace.ID
     let onOpen: (Date) -> Void
 
-    /// The zoom source id carried by the shown month's small copy.
-    static let shownSource = ZoomKey.shownMonth
 
     @State private var position: ScrollPosition
     @State private var visibleYear: Int
     /// Every year with a section on screen, so a tap never scrolls the month it zooms from.
-    @State private var onScreen: Set<Int> = []
+    /// Not observed: scrolling updates it without redrawing anything.
+    @State private var onScreen = OnScreen()
     @State private var pinchUsed = false
 
     private static let calendar = Calendar.current
@@ -22,8 +22,9 @@ struct YearCalendar: View {
     private static let years = Array((thisYear - 3)...(thisYear + 3))
     private let today = Calendar.current.startOfDay(for: Date())
 
-    init(shownMonth: Date, zoom: Namespace.ID, onOpen: @escaping (Date) -> Void) {
+    init(shownMonth: Date, marks: ZoomMarks, zoom: Namespace.ID, onOpen: @escaping (Date) -> Void) {
         self.shownMonth = shownMonth
+        self.marks = marks
         self.zoom = zoom
         self.onOpen = onOpen
         let year = Self.calendar.component(.year, from: shownMonth)
@@ -49,8 +50,8 @@ struct YearCalendar: View {
             ScrollView(.vertical) {
                 LazyVStack(spacing: 0) {
                     ForEach(Self.years, id: \.self) { year in
-                        YearSection(year: year, isFirst: year == Self.years.first, shownMonth: shownMonth,
-                                    today: today, zoom: zoom, onPick: onOpen)
+                        YearSection(year: year, isFirst: year == Self.years.first,
+                                    today: today, marks: marks, zoom: zoom, onPick: onOpen)
                             .id(year)
                     }
                 }
@@ -58,7 +59,7 @@ struct YearCalendar: View {
             }
             .scrollPosition($position, anchor: .top)
             .onScrollTargetVisibilityChange(idType: Int.self, threshold: 0.01) { ids in
-                onScreen = Set(ids)
+                onScreen.years = Set(ids)
                 if let top = ids.min(), top != visibleYear { visibleYear = top }
             }
             .scrollIndicators(.hidden)
@@ -94,9 +95,13 @@ struct YearCalendar: View {
         }
         // Paging the months into a year that isn't on screen: be there when they close.
         .onChange(of: Self.calendar.component(.year, from: shownMonth)) { _, year in
-            if !onScreen.contains(year) { position.scrollTo(id: year, anchor: .top) }
+            if !onScreen.years.contains(year) { position.scrollTo(id: year, anchor: .top) }
         }
     }
+}
+
+private final class OnScreen {
+    var years: Set<Int> = []
 }
 
 /// One year of small months, three across. The year is named in the title above; years
@@ -104,8 +109,8 @@ struct YearCalendar: View {
 private struct YearSection: View {
     let year: Int
     let isFirst: Bool
-    let shownMonth: Date
     let today: Date
+    let marks: ZoomMarks
     let zoom: Namespace.ID
     let onPick: (Date) -> Void
 
@@ -122,10 +127,7 @@ private struct YearSection: View {
                             MiniMonth(shape: MonthShape(m), isThisMonth: m == MonthCalendar.thisMonth, today: today)
                                 .contentShape(Rectangle())
                                 .onTapGesture { onPick(m) }
-                                .background {
-                                    Color.zoomSource.matchedTransitionSource(
-                                        id: m == shownMonth ? YearCalendar.shownSource : .month(m), in: zoom)
-                                }
+                                .background { ZoomSource(kind: .month, date: m, marks: marks, zoom: zoom) }
                         }
                     }
                 }
