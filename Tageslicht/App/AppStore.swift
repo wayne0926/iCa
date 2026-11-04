@@ -103,6 +103,7 @@ final class AppStore {
     @ObservationIgnored private var geocoding = false
     @ObservationIgnored private var here: Coordinate = .bonn
     @ObservationIgnored private var started = false
+    @ObservationIgnored private var reload: Task<Void, Never>?
     /// Learned from the prefetched months, remembered so the first frame already has it.
     @ObservationIgnored private var usual: ClosedRange<Double>? = AppStore.savedUsual()
     /// Routes wait for a real position, so the Bonn fallback never burns API calls.
@@ -141,7 +142,7 @@ final class AppStore {
         for m in months.values { await loadMonth(m) }
 
         NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: source.store, queue: .main) { [weak self] _ in
-            Task { @MainActor in await self?.calendarChanged() }
+            Task { @MainActor in self?.scheduleReload() }
         }
 
         if let c = await location.current() { here = c }
@@ -311,14 +312,40 @@ final class AppStore {
     func setCalendar(_ id: String, shown: Bool) {
         if shown { hiddenCalendars.remove(id) } else { hiddenCalendars.insert(id) }
         source.hidden = hiddenCalendars
-        Task { await calendarChanged() }
+        scheduleReload()
     }
 
+    /// A sync sends EKEventStoreChanged in bursts, and settings toggles come several at once:
+    /// one reload once they have stopped for a moment, not one per notice.
+    private func scheduleReload() {
+        reload?.cancel()
+        reload = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            await calendarChanged()
+        }
+    }
+
+    /// One query per month that anything has asked for, never one per day: the day pages
+    /// already opened are then filled from those months.
     private func calendarChanged() async {
         events.removeAll()
         await prefetchEvents()
-        for m in models.values { await loadEvents(for: m) }
-        for m in months.values { await loadMonth(m) }
+        for key in Set(models.keys.map(monthStart)) where months[key] == nil {
+            months[key] = MonthModel(month: key, calendar: calendar)
+        }
+        for m in months.values.sorted(by: { $0.month < $1.month }) {
+            guard !Task.isCancelled else { return }
+            await loadMonth(m)
+        }
+        for m in models.values {
+            guard !Task.isCancelled else { return }
+            await loadEvents(for: m)
+        }
+    }
+
+    private func monthStart(_ day: Date) -> Date {
+        calendar.dateInterval(of: .month, for: day)?.start ?? day
     }
 
     // MARK: - Weather
