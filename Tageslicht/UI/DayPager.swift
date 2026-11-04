@@ -118,12 +118,13 @@ struct DayPager: View {
                 onDayChange(s)
             }
         }
-        // How far the swipe has gone, for the held-still sun balls. Only they read it.
-        .onScrollGeometryChange(for: CGFloat.self) { g in
+        // The page in view, for the held-still sun balls. Only they read it, and only
+        // when it changes.
+        .onScrollGeometryChange(for: Int.self) { g in
             let width = g.containerSize.width
-            return width > 0 ? (g.contentOffset.x + g.contentInsets.leading) / width : 0
-        } action: { _, p in
-            sunTrack.position = p
+            return width > 0 ? Int(((g.contentOffset.x + g.contentInsets.leading) / width).rounded()) : -1
+        } action: { _, i in
+            sunTrack.page = i
         }
         .overlay {
             if pinGrid { SunOverlay(track: sunTrack, days: days) }

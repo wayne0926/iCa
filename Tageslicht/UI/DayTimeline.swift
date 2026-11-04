@@ -292,41 +292,75 @@ struct TimelineLayout: Layout {
 
     /// Centre of each page's ball, in the pager's coordinates.
     var marks: [Key: Mark] = [:]
-    /// The pager's position in pages: 2.4 is 40% of the way from the third day to the fourth.
-    var position: CGFloat = 0
+    /// The page covering most of the screen; changes once, halfway through a swipe.
+    var page = -1
 }
 
-/// The sun balls held still on screen while the days page under them: each glides up or
-/// down from where one day has it to where the next does, as far as the swipe has gone.
+/// The sun balls held still on screen while the days page under them. When the day
+/// changes, each glides up or down to where the new day has it, on its own easing curve
+/// and time, however fast or slow the swipe; scrolling the day up or down it follows at once.
 struct SunOverlay: View {
     let track: SunTrack
     let days: [Date]
+    /// The page the balls stand on, as a continuous index, eased from one day to the next.
+    @State private var page: Double = 0
 
     var body: some View {
-        let p = max(0, track.position)
-        let i = Int(p.rounded(.down))
-        let f = p - CGFloat(i)
+        let day = days.indices.contains(track.page) ? days[track.page] : nil
         ZStack(alignment: .topTrailing) {
             ForEach([true, false], id: \.self) { rising in
-                if let m = mark(rising: rising, page: i, fraction: f) {
-                    SunBall(date: m.date, rising: rising)
-                        .offset(x: SunBall.hitMargin - SunBall.edge,
-                                y: m.y - SunBall.size / 2 - SunBall.hitMargin)
-                }
+                SunBall(date: day.flatMap { track.marks[SunTrack.Key(day: $0, rising: rising)]?.date } ?? .now,
+                        rising: rising)
+                    .modifier(SunGlide(page: page, rising: rising, track: track, days: days))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         .clipped()
+        .onAppear { page = Double(track.page) }
+        .onChange(of: track.page) { old, new in
+            // One day over glides; a jump (to today, or the pager finding its first page)
+            // lands at once, rather than sweeping through days that aren't there.
+            if abs(new - old) == 1 {
+                withAnimation(.smooth(duration: 0.5)) { page = Double(new) }
+            } else {
+                page = Double(new)
+            }
+        }
+    }
+}
+
+/// Puts a ball where the eased page has it. Only the page index animates: the days' own
+/// spots are read fresh every frame, so a scroll mid-glide is followed exactly, and a
+/// glide interrupted by the next swipe carries on from where it is.
+private struct SunGlide: ViewModifier, Animatable {
+    var page: Double
+    let rising: Bool
+    let track: SunTrack
+    let days: [Date]
+
+    var animatableData: Double {
+        get { page }
+        set { page = newValue }
     }
 
-    private func mark(rising: Bool, page i: Int, fraction f: CGFloat) -> SunTrack.Mark? {
-        func at(_ j: Int) -> SunTrack.Mark? {
-            days.indices.contains(j) ? track.marks[SunTrack.Key(day: days[j], rising: rising)] : nil
+    func body(content: Content) -> some View {
+        let y = spot()
+        content
+            .opacity(y == nil ? 0 : 1)
+            .allowsHitTesting(y != nil)
+            .offset(x: SunBall.hitMargin - SunBall.edge,
+                    y: (y ?? 0) - SunBall.size / 2 - SunBall.hitMargin)
+    }
+
+    private func spot() -> CGFloat? {
+        let i = Int(page.rounded(.down))
+        let f = CGFloat(page - Double(i))
+        func at(_ j: Int) -> CGFloat? {
+            days.indices.contains(j) ? track.marks[SunTrack.Key(day: days[j], rising: rising)]?.y : nil
         }
         let a = at(i), b = f > 0.001 ? at(i + 1) : nil
         switch (a, b) {
-        case let (a?, b?):
-            return SunTrack.Mark(y: a.y + (b.y - a.y) * f, date: f < 0.5 ? a.date : b.date)
+        case let (a?, b?): return a + (b - a) * f
         case let (a?, nil): return a
         case let (nil, b?): return b
         default: return nil
