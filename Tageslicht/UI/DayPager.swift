@@ -351,8 +351,10 @@ private struct WeatherGlyph: View {
                     .stroke(style: Self.stroke)
                     .opacity(raining ? 1 : 0)
                     .animation(Self.turn(raining), value: raining)
-                Flakes(rows: AnimatablePair(flakes.0, flakes.1))
-                    .animation(Self.turn(flakes.0 + flakes.1 > 0), value: flakes.0 * 2 + flakes.1)
+                Flakes(row: 0, amount: flakes.0)
+                    .animation(Self.turn(flakes.0 > 0), value: flakes.0)
+                Flakes(row: 1, amount: flakes.1)
+                    .animation(Self.turn(flakes.1 > 0), value: flakes.1)
                 Mist(amount: fog)
                     .stroke(style: Self.stroke)
                     .opacity(fog)
@@ -435,25 +437,26 @@ private struct WeatherGlyph: View {
         }
     }
 
-    /// Snowflakes as dots, in two staggered rows, each row growing and dropping into place.
+    /// One row of snowflakes as dots, the rows staggered; a row grows and drops into place
+    /// from the cloud, and shrinks back up into it.
     private struct Flakes: Shape {
-        var rows: AnimatablePair<CGFloat, CGFloat>
-        var animatableData: AnimatablePair<CGFloat, CGFloat> {
-            get { rows }
-            set { rows = newValue }
+        let row: Int
+        var amount: CGFloat
+        var animatableData: CGFloat {
+            get { amount }
+            set { amount = newValue }
         }
 
         func path(in r: CGRect) -> Path {
             var p = Path()
+            guard amount > 0.02 else { return p }
             let top = r.minY + WeatherGlyph.underside
-            func dot(_ x: CGFloat, _ y: CGFloat, _ a: CGFloat) {
-                guard a > 0.02 else { return }
-                let radius = 1.6 * a
-                let c = CGPoint(x: r.midX + x, y: top + y - (1 - a) * 3)
-                p.addEllipse(in: CGRect(x: c.x - radius, y: c.y - radius, width: radius * 2, height: radius * 2))
+            let radius = 1.6 * amount
+            let xs: [CGFloat] = row == 0 ? [-5.5, 0, 5.5] : [-2.75, 2.75]
+            let y = top + (row == 0 ? 2 : 6.5) - (1 - amount) * 3
+            for x in xs {
+                p.addEllipse(in: CGRect(x: r.midX + x - radius, y: y - radius, width: radius * 2, height: radius * 2))
             }
-            for i in 0..<3 { dot(CGFloat(i - 1) * 5.5, 2, rows.first) }
-            for i in 0..<2 { dot(CGFloat(i) * 5.5 - 2.75, 6.5, rows.second) }
             return p
         }
     }
