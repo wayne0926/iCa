@@ -20,6 +20,8 @@ struct TimelineWidget: Widget {
             TimelineWidgetView(entry: entry)
                 .containerBackground(for: .widget) { Ink.paper }
         }
+        // Our black page, not the system's grey, wherever the system lets a widget keep it.
+        .containerBackgroundRemovable(false)
         .configurationDisplayName("时间线")
         .description("接下来几个小时的日程；今天的结束后，显示明天的。")
         .supportedFamilies([.systemSmall])
@@ -267,7 +269,8 @@ struct TimelineWidgetView: View {
             HStack(alignment: .center, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(monthDay(p.day))
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 17, weight: .bold))
+                        .widgetAccentable()
                     Text(p.isToday ? p.day.formatted(Date.FormatStyle(locale: Self.zh).weekday(.abbreviated)) : "明天")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(p.isToday ? Ink.now : Ink.graphite)
@@ -275,8 +278,9 @@ struct TimelineWidgetView: View {
                 Spacer(minLength: 0)
                 if let s = p.symbol {
                     Image(systemName: s)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 17, weight: .semibold))
                         .symbolRenderingMode(.monochrome)
+                        .widgetAccentable()
                 }
             }
             .padding(.leading, 2)
@@ -323,6 +327,7 @@ private struct MiniTimeline: View {
                     Text(String(format: "%02d", h % 24))
                         .font(.system(size: 10, weight: .semibold).monospacedDigit())
                         .foregroundStyle(Ink.hourInk)
+                        .widgetAccentable()
                         .frame(width: Self.gutter - 3, alignment: .leading)
                         .offset(y: y(Double(h)) - 6)
                 }
@@ -340,10 +345,12 @@ private struct MiniTimeline: View {
                             .fill(Ink.now)
                             .frame(width: g.size.width - Self.gutter, height: 1.5)
                             .offset(x: Self.gutter, y: y(h) - 0.75)
+                            .widgetAccentable()
                         Circle()
                             .fill(Ink.now)
                             .frame(width: 6, height: 6)
                             .offset(x: Self.gutter - 3, y: y(h) - 3)
+                            .widgetAccentable()
                     }
                 }
             }
@@ -397,10 +404,12 @@ private struct Block: View {
             RoundedRectangle(cornerRadius: 1.5)
                 .fill(Ink.mark(event))
                 .frame(width: 3)
+                .widgetAccentable()
             VStack(alignment: .leading, spacing: 1) {
                 Text(event.title)
                     .font(.system(size: 11, weight: .semibold))
                     .lineLimit(height >= 44 ? 2 : 1)
+                    .widgetAccentable()
                 if height >= 34 {
                     Text(detail)
                         .font(.system(size: 10).monospacedDigit())

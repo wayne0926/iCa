@@ -23,8 +23,8 @@ targets:
       properties:
         CFBundleDisplayName: iCa
         CFBundleDevelopmentRegion: zh-Hans
-        CFBundleShortVersionString: "0.9.45"
-        CFBundleVersion: "86"
+        CFBundleShortVersionString: "0.9.46"
+        CFBundleVersion: "87"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSCalendarsFullAccessUsageDescription: 读取系统日历中的日程，在时间线上显示。
@@ -53,8 +53,8 @@ targets:
       properties:
         CFBundleDisplayName: iCa
         CFBundleDevelopmentRegion: zh-Hans
-        CFBundleShortVersionString: "0.9.45"
-        CFBundleVersion: "86"
+        CFBundleShortVersionString: "0.9.46"
+        CFBundleVersion: "87"
         NSCalendarsFullAccessUsageDescription: 读取系统日历中的日程，在小组件上显示。
         NSWidgetWantsLocation: true
         NSExtension:
