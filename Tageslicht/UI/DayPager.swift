@@ -343,6 +343,7 @@ private struct WeatherGlyph: View {
                 Flakes(rows: AnimatablePair(flakes.0, flakes.1))
                 Mist(amount: fog)
                     .stroke(style: Self.stroke)
+                    .opacity(fog)
                 Image(systemName: "bolt.fill")
                     .font(.system(size: 10, weight: .semibold))
                     .scaleEffect(bolt ? 1 : 0.5, anchor: .top)
@@ -443,7 +444,8 @@ private struct WeatherGlyph: View {
         }
     }
 
-    /// Fog: two lines under the cloud, drawn out from the middle.
+    /// Fog: two lines under the cloud. They come down out of it and widen as they come,
+    /// and leave the same way back, fading; never shortened to dots.
     private struct Mist: Shape {
         var amount: CGFloat
         var animatableData: CGFloat {
@@ -453,11 +455,11 @@ private struct WeatherGlyph: View {
 
         func path(in r: CGRect) -> Path {
             var p = Path()
-            guard amount > 0.02 else { return p }
-            let top = r.minY + WeatherGlyph.underside
+            let top = r.minY + WeatherGlyph.underside - (1 - amount) * 6
+            let width = 0.7 + 0.3 * amount
             for (y, half) in [(CGFloat(2), CGFloat(8)), (CGFloat(6), CGFloat(5.5))] {
-                p.move(to: CGPoint(x: r.midX - half * amount, y: top + y))
-                p.addLine(to: CGPoint(x: r.midX + half * amount, y: top + y))
+                p.move(to: CGPoint(x: r.midX - half * width, y: top + y))
+                p.addLine(to: CGPoint(x: r.midX + half * width, y: top + y))
             }
             return p
         }
