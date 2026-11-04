@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 /// Rain (or snow) falling across the hours it is forecast, with depth: every drop has
@@ -11,7 +12,8 @@ import SwiftUI
 /// Drops are placed by a fixed hash of their index and moved by the clock, so there is
 /// no per-drop state and nothing to allocate between frames. Drops are batched by depth
 /// and by fade level: a dozen strokes per frame at most. The clock only runs on the
-/// page in view and stops under Reduce Motion.
+/// page in view, at most 60 times a second even on a 120 Hz screen, and stops under
+/// Reduce Motion and in Low Power Mode, where the shower stands still.
 struct RainLayer: View {
     enum Plane { case behind, inFront }
 
@@ -22,6 +24,7 @@ struct RainLayer: View {
     let plane: Plane
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
 
     /// Depth planes; the last one is the near plane drawn over the cards.
     private static let depths = 4
@@ -37,7 +40,7 @@ struct RainLayer: View {
 
     var body: some View {
         // The canvas only covers this shower's hours (plus margin), never the whole day.
-        TimelineView(.animation(minimumInterval: nil, paused: !active || reduceMotion)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !active || reduceMotion || lowPower)) { timeline in
             Canvas { ctx, size in
                 let t = timeline.date.timeIntervalSinceReferenceDate
                 let field = Field(left: Theme.gutter * 0.5, right: size.width)
@@ -52,6 +55,10 @@ struct RainLayer: View {
             }
         }
         .allowsHitTesting(false)
+        .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange)
+            .receive(on: RunLoop.main)) { _ in
+            lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+        }
     }
 
     private struct Band {
