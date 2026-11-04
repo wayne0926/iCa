@@ -47,28 +47,57 @@ struct RootView: View {
     }
 }
 
+/// Zoom source ids: one type at both ends of every zoom. The shown day's cell and the shown
+/// month's small copy carry the shared case; every other one its own.
+enum ZoomKey: Hashable {
+    case shownDay, shownMonth
+    case day(Date), month(Date)
+}
+
+extension Color {
+    /// The frame a zoom runs from. Drawn, never seen: an empty Color.clear may not count as
+    /// a source, and the zoom then falls back to the middle of the screen.
+    static let zoomSource = Color.black.opacity(0.001)
+}
+
 #if DEBUG
 /// Launch with `-zoomProbe`: the system zoom with nothing of the app around it, one row per
 /// way of marking the source. A row whose pages open from and close into the middle of the
-/// screen marks its source in a way this system doesn't find.
-///   A: the visible square itself (Apple's own pattern)
-///   B: an empty Color.clear behind the square (what the app does)
-///   C: a nearly invisible colour behind the square
+/// screen marks its source in a way the system doesn't find.
+///   A: the visible square itself, own id each (Apple's own pattern)
+///   B: an empty Color.clear behind the square, own id each
+///   C: a nearly invisible colour behind the square, own id each
+///   D: the visible square, one shared id that moves to the tapped square, pushed by
+///      tap and path a pass later (how the app opens its pages)
+///   E: as D, the source an empty Color.clear behind (exactly what the app did until 0.9.4)
 private struct ZoomProbe: View {
     private struct Item: Hashable { let row: Int; let col: Int }
+    private static let shared = "probeShown"
+    private static let titles = ["A  visible, own id", "B  Color.clear, own id", "C  opacity 0.001, own id",
+                                 "D  visible, shared id, tap + path", "E  Color.clear, shared id, tap + path"]
     @Namespace private var ns
+    @State private var path: [Item] = []
+    @State private var shown: Item?
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 28) {
-                ForEach(0..<3, id: \.self) { row in
+        NavigationStack(path: $path) {
+            VStack(alignment: .leading, spacing: 22) {
+                ForEach(0..<5, id: \.self) { row in
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(["A  visible square", "B  Color.clear behind", "C  opacity 0.001 behind"][row])
-                            .font(.headline)
+                        Text(Self.titles[row]).font(.subheadline.weight(.semibold))
                         HStack(spacing: 12) {
                             ForEach(0..<4, id: \.self) { col in
-                                NavigationLink(value: Item(row: row, col: col)) { cell(row: row, col: col) }
-                                    .buttonStyle(.plain)
+                                let item = Item(row: row, col: col)
+                                if row < 3 {
+                                    NavigationLink(value: item) { cell(item) }.buttonStyle(.plain)
+                                } else {
+                                    cell(item)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            shown = item
+                                            DispatchQueue.main.async { path.append(item) }
+                                        }
+                                }
                             }
                         }
                     }
@@ -79,23 +108,29 @@ private struct ZoomProbe: View {
             .padding(20)
             .navigationTitle("Zoom probe")
             .navigationDestination(for: Item.self) { item in
-                Color(hue: Double(item.col) / 4, saturation: 0.5, brightness: 0.9)
-                    .overlay(Text("\(["A", "B", "C"][item.row])\(item.col + 1)").font(.largeTitle.bold()))
+                let page = Color(hue: Double(item.col) / 4, saturation: 0.5, brightness: 0.9)
+                    .overlay(Text("\(["A", "B", "C", "D", "E"][item.row])\(item.col + 1)").font(.largeTitle.bold()))
                     .ignoresSafeArea()
-                    .navigationTransition(.zoom(sourceID: item, in: ns))
+                if item.row < 3 {
+                    page.navigationTransition(.zoom(sourceID: item, in: ns))
+                } else {
+                    page.navigationTransition(.zoom(sourceID: Self.shared, in: ns))
+                }
             }
         }
     }
 
-    @ViewBuilder private func cell(row: Int, col: Int) -> some View {
+    @ViewBuilder private func cell(_ item: Item) -> some View {
         let square = RoundedRectangle(cornerRadius: 10)
-            .fill(Color(hue: Double(col) / 4, saturation: 0.5, brightness: 0.9))
-            .frame(width: 64, height: 64)
-        let id = Item(row: row, col: col)
-        switch row {
-        case 0: square.matchedTransitionSource(id: id, in: ns)
-        case 1: square.background { Color.clear.matchedTransitionSource(id: id, in: ns) }
-        default: square.background { Color.black.opacity(0.001).matchedTransitionSource(id: id, in: ns) }
+            .fill(Color(hue: Double(item.col) / 4, saturation: 0.5, brightness: 0.9))
+            .frame(width: 60, height: 60)
+        let movingID = item == shown ? AnyHashable(Self.shared) : AnyHashable(item)
+        switch item.row {
+        case 0: square.matchedTransitionSource(id: item, in: ns)
+        case 1: square.background { Color.clear.matchedTransitionSource(id: item, in: ns) }
+        case 2: square.background { Color.black.opacity(0.001).matchedTransitionSource(id: item, in: ns) }
+        case 3: square.matchedTransitionSource(id: movingID, in: ns)
+        default: square.background { Color.clear.matchedTransitionSource(id: movingID, in: ns) }
         }
     }
 

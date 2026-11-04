@@ -40,7 +40,7 @@ struct MonthCalendar: View {
     let onOpen: (Date) -> Void
 
     /// The zoom source id carried by the shown day's cell.
-    static let shownSource = "shownDay"
+    static let shownSource = ZoomKey.shownDay
 
     @AppStorage("monthDetailed") private var detailed = true
     @AppStorage(MonthColorStyle.key) private var colorStyle = MonthColorStyle.dot
@@ -291,9 +291,8 @@ private struct WeekRow: View {
                             // The zoom runs from an empty frame, not a picture of the cell: the
                             // page alone grows and shrinks, the cell never blows up over it.
                             .background {
-                                Color.clear
-                                    .matchedTransitionSource(id: day == shown ? AnyHashable(MonthCalendar.shownSource) : AnyHashable(day),
-                                                             in: zoom)
+                                Color.zoomSource
+                                    .matchedTransitionSource(id: day == shown ? MonthCalendar.shownSource : .day(day), in: zoom)
                             }
                     }
                 }

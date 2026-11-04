@@ -9,7 +9,7 @@ struct YearCalendar: View {
     let onOpen: (Date) -> Void
 
     /// The zoom source id carried by the shown month's small copy.
-    static let shownSource = "shownMonth"
+    static let shownSource = ZoomKey.shownMonth
 
     @State private var position: ScrollPosition
     @State private var visibleYear: Int
@@ -123,8 +123,8 @@ private struct YearSection: View {
                                 .contentShape(Rectangle())
                                 .onTapGesture { onPick(m) }
                                 .background {
-                                    Color.clear.matchedTransitionSource(
-                                        id: m == shownMonth ? AnyHashable(YearCalendar.shownSource) : AnyHashable(m), in: zoom)
+                                    Color.zoomSource.matchedTransitionSource(
+                                        id: m == shownMonth ? YearCalendar.shownSource : .month(m), in: zoom)
                                 }
                         }
                     }
