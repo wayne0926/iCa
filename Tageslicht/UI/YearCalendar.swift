@@ -8,13 +8,12 @@ struct YearCalendar: View {
     let zoom: Namespace.ID
     let onOpen: (Date) -> Void
 
-    /// The zoom source id carried by the shown month's small copy.
-    static let shownSource = "shownMonth"
 
     @State private var position: ScrollPosition
     @State private var visibleYear: Int
     /// Every year with a section on screen, so a tap never scrolls the month it zooms from.
-    @State private var onScreen: Set<Int> = []
+    /// Not observed: scrolling updates it without redrawing anything.
+    @State private var onScreen = OnScreen()
     @State private var pinchUsed = false
 
     private static let calendar = Calendar.current
@@ -49,7 +48,7 @@ struct YearCalendar: View {
             ScrollView(.vertical) {
                 LazyVStack(spacing: 0) {
                     ForEach(Self.years, id: \.self) { year in
-                        YearSection(year: year, isFirst: year == Self.years.first, shownMonth: shownMonth,
+                        YearSection(year: year, isFirst: year == Self.years.first,
                                     today: today, zoom: zoom, onPick: onOpen)
                             .id(year)
                     }
@@ -58,7 +57,7 @@ struct YearCalendar: View {
             }
             .scrollPosition($position, anchor: .top)
             .onScrollTargetVisibilityChange(idType: Int.self, threshold: 0.01) { ids in
-                onScreen = Set(ids)
+                onScreen.years = Set(ids)
                 if let top = ids.min(), top != visibleYear { visibleYear = top }
             }
             .scrollIndicators(.hidden)
@@ -94,9 +93,13 @@ struct YearCalendar: View {
         }
         // Paging the months into a year that isn't on screen: be there when they close.
         .onChange(of: Self.calendar.component(.year, from: shownMonth)) { _, year in
-            if !onScreen.contains(year) { position.scrollTo(id: year, anchor: .top) }
+            if !onScreen.years.contains(year) { position.scrollTo(id: year, anchor: .top) }
         }
     }
+}
+
+private final class OnScreen {
+    var years: Set<Int> = []
 }
 
 /// One year of small months, three across. The year is named in the title above; years
@@ -104,7 +107,6 @@ struct YearCalendar: View {
 private struct YearSection: View {
     let year: Int
     let isFirst: Bool
-    let shownMonth: Date
     let today: Date
     let zoom: Namespace.ID
     let onPick: (Date) -> Void
@@ -123,8 +125,7 @@ private struct YearSection: View {
                                 .contentShape(Rectangle())
                                 .onTapGesture { onPick(m) }
                                 .background {
-                                    Color.clear.matchedTransitionSource(
-                                        id: m == shownMonth ? AnyHashable(YearCalendar.shownSource) : AnyHashable(m), in: zoom)
+                                    Color.clear.matchedTransitionSource(id: ZoomID.month(m), in: zoom)
                                 }
                         }
                     }

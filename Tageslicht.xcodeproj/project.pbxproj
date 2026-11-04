@@ -13,6 +13,7 @@
 		283AD8AAD1F6BDFDDDD104B9 /* WeatherService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F471545FD25EA69790D47DC /* WeatherService.swift */; };
 		3D5AD63971DD4EBB40677BFD /* Blocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AAA3A0AABBCB151DEF7B9AE /* Blocks.swift */; };
 		46AD7CF52BF1936BFF07D804 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8DD90A24AD2B4FB9265335 /* SettingsView.swift */; };
+		4F005D664DCB559B8035B525 /* FrameStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3949F2BB1DE8288ABFDCA636 /* FrameStats.swift */; };
 		5B0C60DF88E0CF89C08CF392 /* MonthCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D2BF616D7E1C5BDB0ADC14C /* MonthCalendar.swift */; };
 		6372D7CF7E09A72041DD1CEB /* RainLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0177CD915A2A1E4BCF4F01 /* RainLayer.swift */; };
 		701DC1BB40BF2AAEA704E172 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDD466A76C69A651671EF3AE /* Theme.swift */; };
@@ -21,6 +22,7 @@
 		974FBA7413BE19A84C5639DA /* LogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D75F8EEB762BCBDE84DD828 /* LogicTests.swift */; };
 		9D5D7EE731B79CA3EC268795 /* DayPager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECA59A2EB922034933D6DD2 /* DayPager.swift */; };
 		A8EECE82FDBDAEDFB72D1E84 /* DayTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = F91D7AE179F9323A4C825CED /* DayTimeline.swift */; };
+		AAEF16F6BAE547134444BE6F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 12A38550B0FE9E98C9EDE52D /* Assets.xcassets */; };
 		AE4BF2E88249858A5BA94D1D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8B89FD4940902BC4B4BC6DC /* Models.swift */; };
 		AE6E12BF9B4273A65DE82CA4 /* PrecipSpan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FFC37FF59C876623FAC4C25 /* PrecipSpan.swift */; };
 		B3F1EB921EC8201F4989EF91 /* DayLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79157D3F4C0278A6378909E0 /* DayLayout.swift */; };
@@ -52,12 +54,14 @@
 		05A2B350B51E82359ECD2988 /* Infrastructure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure.swift; sourceTree = "<group>"; };
 		0CFFEB21E7E514C27BD01F2A /* RoutesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutesService.swift; sourceTree = "<group>"; };
 		0D75F8EEB762BCBDE84DD828 /* LogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogicTests.swift; sourceTree = "<group>"; };
+		12A38550B0FE9E98C9EDE52D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		188C13477CFF11D0FE23506E /* FrameDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameDriver.swift; sourceTree = "<group>"; };
 		1AAA3A0AABBCB151DEF7B9AE /* Blocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Blocks.swift; sourceTree = "<group>"; };
 		1C0177CD915A2A1E4BCF4F01 /* RainLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RainLayer.swift; sourceTree = "<group>"; };
 		1F471545FD25EA69790D47DC /* WeatherService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherService.swift; sourceTree = "<group>"; };
 		28D3A2E89D860BC04752DF5E /* Hyphenation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hyphenation.swift; sourceTree = "<group>"; };
 		2A9DD952332E08B3E4A7AFF8 /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
+		3949F2BB1DE8288ABFDCA636 /* FrameStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameStats.swift; sourceTree = "<group>"; };
 		3C3309E2020E6011D28E05CC /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
 		48C899325BF463E35902AB62 /* YearCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YearCalendar.swift; sourceTree = "<group>"; };
 		4FFC884C81B19D09041A3A3E /* WeatherKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherKind.swift; sourceTree = "<group>"; };
@@ -108,6 +112,7 @@
 		3F8D8928F1E0BEBFA3600D61 /* Tageslicht */ = {
 			isa = PBXGroup;
 			children = (
+				12A38550B0FE9E98C9EDE52D /* Assets.xcassets */,
 				BD5A33CE2A62FF201BCF2C87 /* Info.plist */,
 				4C9008C089C598EF67D84530 /* App */,
 				393996B3152729EEECDC3E53 /* Logic */,
@@ -141,6 +146,7 @@
 			children = (
 				7CDE7035F4E279F24A600CD8 /* CalendarSource.swift */,
 				EE28B07C0E77DDBA79BC6F58 /* DemoSeed.swift */,
+				3949F2BB1DE8288ABFDCA636 /* FrameStats.swift */,
 				CADDCBDABFB94CFE159719A1 /* Geocoder.swift */,
 				05A2B350B51E82359ECD2988 /* Infrastructure.swift */,
 				0CFFEB21E7E514C27BD01F2A /* RoutesService.swift */,
@@ -219,6 +225,7 @@
 			buildConfigurationList = F5ACAD2C8577CCFEA1BABBBE /* Build configuration list for PBXNativeTarget "Tageslicht" */;
 			buildPhases = (
 				F41DAC45C55D0A4F9BC83FFC /* Sources */,
+				C797678B0E1DA3BB4EDA8462 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -270,6 +277,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		C797678B0E1DA3BB4EDA8462 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEF16F6BAE547134444BE6F /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		B15F4A673AFFA684560DF5A9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -293,6 +311,7 @@
 				EA282BB6013D4C6610CE87AB /* DemoSeed.swift in Sources */,
 				D82EABBDF96FA0EF1CA82686 /* EventDetailView.swift in Sources */,
 				B7A99BEFA3DFD93267D5BAF1 /* FrameDriver.swift in Sources */,
+				4F005D664DCB559B8035B525 /* FrameStats.swift in Sources */,
 				E6CBCFE23401AF79F054D9BA /* Geocoder.swift in Sources */,
 				8AD2F6338FAD75263A25DF52 /* Hyphenation.swift in Sources */,
 				CAE413988BDCB8A6DD7A7285 /* Infrastructure.swift in Sources */,

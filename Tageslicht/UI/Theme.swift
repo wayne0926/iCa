@@ -82,6 +82,18 @@ enum CalendarInk {
         })
     }
 
+    /// A block coloured in its calendar's colour, for the month view's "filled" style. Light
+    /// enough under dark text on a white page; on a dark page, deep enough under light text.
+    static func fill(_ rgb: RGB) -> Color {
+        Color(UIColor { t in
+            let dark = t.userInterfaceStyle == .dark
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            (dark ? lifted(rgb) : UIColor(rgb)).getRed(&r, green: &g, blue: &b, alpha: &a)
+            let base: CGFloat = dark ? 0.11 : 1, k: CGFloat = dark ? 0.42 : 0.30
+            return UIColor(red: base + (r - base) * k, green: base + (g - base) * k, blue: base + (b - base) * k, alpha: 1)
+        })
+    }
+
     private static func lifted(_ rgb: RGB) -> UIColor {
         var h: CGFloat = 0, s: CGFloat = 0, v: CGFloat = 0, a: CGFloat = 0
         UIColor(rgb).getHue(&h, saturation: &s, brightness: &v, alpha: &a)
@@ -157,4 +169,18 @@ extension VehicleKind {
         default: return ""
         }
     }
+}
+
+/// How the month view shows which calendar an event belongs to.
+enum MonthColorStyle: String, CaseIterable {
+    /// A small dot in the calendar's colour on a plain block.
+    case dot
+    /// The whole block in the calendar's colour.
+    case fill
+
+    static let key = "monthColorStyle"
+}
+
+extension EnvironmentValues {
+    @Entry var monthColorStyle: MonthColorStyle = .dot
 }

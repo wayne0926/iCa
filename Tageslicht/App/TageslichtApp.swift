@@ -11,7 +11,10 @@ struct TageslichtApp: App {
                 .environment(store)
                 // The timeline's geometry is fixed; past this size labels would collide.
                 .dynamicTypeSize(...DynamicTypeSize.xxLarge)
-                .task { await store.start() }
+                .task {
+                    FrameStats.shared.startIfRequested()
+                    await store.start()
+                }
                 .onChange(of: phase) { _, p in
                     if p == .active { Task { await store.refresh() } }
                 }
@@ -32,6 +35,21 @@ struct RootView: View {
     }
 }
 
+/// Where the reader is, kept without redrawing anything: the month at the top of the month
+/// view and the day the day pages show. Read only when a page opens or closes.
+/// Names a zoom source: each day cell and each small month carries its own, for good.
+/// The open page names the one it shows now, so after paging or scrolling it closes
+/// into the right one.
+enum ZoomID: Hashable {
+    case day(Date)
+    case month(Date)
+}
+
+final class NavTracker {
+    var month = MonthCalendar.thisMonth
+    var day: Date?
+}
+
 /// Year → months → day, each opening out of the one below with the system zoom, as in
 /// iOS Calendar. The app starts on the months (or the year, if that's where it was left).
 private struct CalendarRoot: View {
@@ -41,11 +59,9 @@ private struct CalendarRoot: View {
     }
 
     @State private var path: [Route]
-    @State private var jump: Date?
-    /// The month the month view shows, and the day the day pages show; their small copies
-    /// below carry the zoom sources.
+    /// The month the year view should have on screen when the months close into it.
     @State private var shownMonth = MonthCalendar.thisMonth
-    @State private var shownDay: Date?
+    @State private var tracker = NavTracker()
     @Namespace private var zoom
     @AppStorage("showYear") private var showYear = false
 
@@ -57,36 +73,52 @@ private struct CalendarRoot: View {
     var body: some View {
         NavigationStack(path: $path) {
             YearCalendar(shownMonth: shownMonth, zoom: zoom) { month in
-                // The source moves first; the page opens a pass later, so the zoom starts
-                // from what was tapped.
                 shownMonth = month
-                DispatchQueue.main.async { path = [.month(month)] }
+                path = [.month(month)]
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .month(let month):
-                    MonthCalendar(start: month, jump: $jump, shown: shownDay, zoom: zoom,
-                                  onVisibleMonth: { shownMonth = $0 },
-                                  onYear: { path.removeAll() }) { day in
-                        shownDay = day
-                        DispatchQueue.main.async { path.append(.day(day)) }
+                    MonthCalendar(start: month, tracker: tracker, zoom: zoom,
+                                  onYear: { visible in
+                                      // The year view brings that year on screen, then the
+                                      // months close into its small copy.
+                                      shownMonth = visible
+                                      DispatchQueue.main.async { path.removeAll() }
+                                  }) { day in
+                        tracker.day = day
+                        path.append(.day(day))
                     }
+                    // A month page opened on another month is a new page, with its own scroll.
+                    .id(month)
                     .toolbar(.hidden, for: .navigationBar)
-                    .navigationTransition(.zoom(sourceID: YearCalendar.shownSource, in: zoom))
                 case .day(let day):
-                    DayPager(start: day, onDayChange: { now in
-                        shownDay = now
-                        // Paged into another month: going back lands on that month.
-                        jump = MonthCalendar.calendar.dateInterval(of: .month, for: now)?.start
-                    }, onClose: { if !path.isEmpty { path.removeLast() } })
+                    DayPager(start: day, zoom: zoom, onDayChange: { [tracker] now in tracker.day = now },
+                             onClose: { close(openedOn: day) })
                     .toolbar(.hidden, for: .navigationBar)
-                    .navigationTransition(.zoom(sourceID: MonthCalendar.shownSource, in: zoom))
                 }
             }
         }
         .tint(Theme.ink)
         .onChange(of: path.isEmpty) { _, atYear in showYear = atYear }
+    }
+
+    /// Back to the months, zooming into the cell of the day the pages are on now. Paged into
+    /// another month: a month view opened on that month takes the place of the old one, so
+    /// the cell is there to zoom into.
+    private func close(openedOn opened: Date) {
+        guard !path.isEmpty else { return }
+        let month = Self.monthStart(tracker.day ?? opened)
+        if month != Self.monthStart(opened) {
+            path = [.month(month)]
+        } else {
+            path.removeLast()
+        }
+    }
+
+    private static func monthStart(_ day: Date) -> Date {
+        MonthCalendar.calendar.dateInterval(of: .month, for: day)?.start ?? day
     }
 }
 
@@ -98,7 +130,7 @@ private struct AccessDeniedView: View {
                 .foregroundStyle(Theme.graphite)
             Text("需要日历权限")
                 .font(.headline)
-            Text("在“设置”里允许 Tageslicht 访问日历，才能显示你的日程。")
+            Text("在“设置”里允许 iCa 访问日历，才能显示你的日程。")
                 .font(.subheadline)
                 .foregroundStyle(Theme.graphite)
                 .multilineTextAlignment(.center)

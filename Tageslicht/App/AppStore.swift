@@ -33,6 +33,8 @@ struct MonthItem: Hashable {
     let title: String
     /// Nil for all-day events.
     let start: Date?
+    /// The start, written out once here rather than on every redraw.
+    let time: String?
     let color: RGB
     /// Runs over more than one day; the grid draws it as one bar, not a chip per day.
     let spanning: Bool
@@ -133,6 +135,7 @@ final class AppStore {
         guard access == .granted else { return }
         #if DEBUG
         DemoSeed.runIfRequested(store: source.store)
+        DemoSeed.seedSemesterIfRequested(store: source.store)
         #endif
         await prefetchEvents()
         for m in months.values { await loadMonth(m) }
@@ -260,7 +263,8 @@ final class AppStore {
                     spans[e.id] = MonthSpan(id: e.id, title: e.title, color: e.calendarColor, first: first, last: last)
                 }
                 // An event carried over from yesterday starts, for this day, at midnight.
-                return MonthItem(id: e.id, title: title, start: e.isAllDay ? nil : max(e.start, d),
+                let start = e.isAllDay ? nil : max(e.start, d)
+                return MonthItem(id: e.id, title: title, start: start, time: start?.formatted(Fmt.time),
                                  color: e.calendarColor, spanning: spanning)
             }
         }
