@@ -23,8 +23,8 @@ targets:
       properties:
         CFBundleDisplayName: iCa
         CFBundleDevelopmentRegion: zh-Hans
-        CFBundleShortVersionString: "0.9.36"
-        CFBundleVersion: "77"
+        CFBundleShortVersionString: "0.9.37"
+        CFBundleVersion: "78"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSCalendarsFullAccessUsageDescription: 读取系统日历中的日程，在时间线上显示。

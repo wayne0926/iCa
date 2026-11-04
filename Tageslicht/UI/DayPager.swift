@@ -453,10 +453,13 @@ private struct WeatherGlyph: View {
             guard amount > 0.02 else { return p }
             let top = r.minY + WeatherGlyph.underside
             let radius = 1.6 * amount
-            let xs: [CGFloat] = row == 0 ? [-5.5, 0, 5.5] : [-2.75, 2.75]
-            let y = top + (row == 0 ? 2 : 6.5) - (1 - amount) * 3
-            for x in xs {
-                p.addEllipse(in: CGRect(x: r.midX + x - radius, y: y - radius, width: radius * 2, height: radius * 2))
+            // The first row sits on the drops' own spots, the middle one lower as its drop is,
+            // so rain and snow trade places rather than shifting; the second row falls between.
+            let spots: [(CGFloat, CGFloat)] = row == 0 ? [(-5.5, 2), (0, 3.5), (5.5, 2)] : [(-2.75, 7), (2.75, 7)]
+            let rise = (1 - amount) * 3
+            for (x, y) in spots {
+                let c = CGPoint(x: r.midX + x, y: top + y - rise)
+                p.addEllipse(in: CGRect(x: c.x - radius, y: c.y - radius, width: radius * 2, height: radius * 2))
             }
             return p
         }
