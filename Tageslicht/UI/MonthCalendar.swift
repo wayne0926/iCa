@@ -46,6 +46,10 @@ struct MonthCalendar: View {
     /// The month at the top. Only the year title and the today button read it, so a new
     /// month scrolling in never redraws the list.
     @State private var cursor: MonthCursor
+    /// The list's slide and fade while it jumps to another month (see `jump(to:)`).
+    @State private var slide: CGFloat = 0
+    @State private var fade: Double = 1
+    @State private var jumping = false
     private let start: Date
 
     static let calendar = Calendar.current
@@ -105,11 +109,53 @@ struct MonthCalendar: View {
             }
             .scrollIndicators(.hidden)
             .simultaneousGesture(pinch)
+            .offset(y: slide)
+            .opacity(fade)
+            .clipped()
         }
         .environment(\.monthColorStyle, colorStyle)
         .background(Theme.paper)
         .background { FollowJump(marks: marks, cursor: cursor, position: $position) }
-        .overlay(alignment: .bottomTrailing) { TodayButton(cursor: cursor, position: $position) }
+        .overlay(alignment: .bottomTrailing) {
+            TodayButton(cursor: cursor) { jump(to: Self.thisMonth) }
+        }
+    }
+
+    /// To another month, months away. An animated scroll can't do this in a lazy list
+    /// whose rows have different heights: it heads for a guessed offset, corrects it on
+    /// the way, and slides the rows it builds in flight over each other, so every run
+    /// looks different. Instead the list slides a little the way it would scroll and
+    /// fades, jumps while unseen, and comes in from the other side on an easing curve.
+    /// Only the list's layer moves; nothing in it animates.
+    private func jump(to month: Date) {
+        guard !jumping, month != cursor.visible else { return }
+        jumping = true
+        // Later months are further down: the content moves up, as a scroll down would.
+        let travel: CGFloat = month > cursor.visible ? -44 : 44
+        withAnimation(.easeIn(duration: 0.12)) {
+            slide = travel
+            fade = 0
+        } completion: {
+            var still = Transaction()
+            still.disablesAnimations = true
+            withTransaction(still) {
+                position.scrollTo(id: MonthRowID(month: month, week: -1), anchor: .top)
+                slide = -travel
+            }
+            // Told outright: a jump made in code doesn't always report what came into view.
+            marks.month = month
+            // A turn later, so the jump has been laid out and drawn unseen first, and the
+            // way in starts from the far side, not from where the way out ended.
+            DispatchQueue.main.async {
+                withAnimation(.smooth(duration: 0.38)) {
+                    cursor.visible = month
+                    slide = 0
+                    fade = 1
+                } completion: {
+                    jumping = false
+                }
+            }
+        }
     }
 
     static func yearTitle(_ year: Int) -> String { "\(String(year))年" }
@@ -155,6 +201,8 @@ private struct FollowJump: View {
         Color.clear.onChange(of: marks.jump) { _, month in
             guard let month, month != cursor.visible else { return }
             position.scrollTo(id: MonthRowID(month: month, week: -1), anchor: .top)
+            // The list is hidden under the day pages and may not report what it shows.
+            cursor.visible = month
         }
     }
 }
@@ -181,15 +229,11 @@ private struct YearButton: View {
 
 private struct TodayButton: View {
     let cursor: MonthCursor
-    @Binding var position: ScrollPosition
+    let action: () -> Void
 
     var body: some View {
         if cursor.visible != MonthCalendar.thisMonth {
-            Button {
-                withAnimation(.snappy) {
-                    position.scrollTo(id: MonthRowID(month: MonthCalendar.thisMonth, week: -1), anchor: .top)
-                }
-            } label: {
+            Button(action: action) {
                 Label("今天", systemImage: cursor.visible > MonthCalendar.thisMonth ? "chevron.up" : "chevron.down")
                     .font(.system(size: 13, weight: .semibold))
                     .labelStyle(CompactLabelStyle())
@@ -199,6 +243,7 @@ private struct TodayButton: View {
             }
             .buttonStyle(.plain)
             .padding(20)
+            .transition(.opacity)
         }
     }
 }
