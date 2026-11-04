@@ -55,6 +55,15 @@ struct DaySummary: Hashable {
     /// e.g. "15:00–17:00 有雨"; nil when dry.
     let wetSpan: String?
 
+    /// Past the hourly forecast: the 46-day ensemble's weather for the day, no more.
+    init(outlook o: DayOutlook) {
+        low = 0
+        high = 0
+        kind = WeatherKind(pictocode: o.pictocode)
+        symbol = kind.symbol(daylight: true)
+        wetSpan = nil
+    }
+
     init?(hours: [HourWeather], calendar: Calendar = .current) {
         guard !hours.isEmpty else { return nil }
         let temps = hours.map(\.temperature)

@@ -433,9 +433,9 @@ private struct CellRain: View {
     /// Drops per 1000 pt², by the heaviest hour.
     private var density: Double {
         switch wet.intensity {
-        case ..<0.5: return 0.7
-        case ..<2: return 1.0
-        default: return 1.4
+        case ..<0.5: return 1.0
+        case ..<2: return 1.5
+        default: return 2.0
         }
     }
 
@@ -456,7 +456,7 @@ private struct CellRain: View {
             let fall = CGFloat((60 + 50 * near) * local)
             let y = CGFloat(again(i, c, 5)) * size.height + fall
             let x = CGFloat(again(i, c, 4)) * size.width - fall * slant
-            let length = CGFloat(4 + 4 * near)
+            let length = CGFloat(6 + 6 * near)
             let edge = min(1, max(0, min(y, size.height - y - length) / 10))
             let alpha = CGFloat(sin(Double.pi * local / life)) * edge
             guard alpha > 0.08 else { continue }
@@ -464,10 +464,11 @@ private struct CellRain: View {
             paths[level].move(to: CGPoint(x: x, y: y))
             paths[level].addLine(to: CGPoint(x: x - length * slant, y: y + length))
         }
-        // Short and round-ended: drops, not streaks.
-        let style = StrokeStyle(lineWidth: 2.4, lineCap: .round)
+        // Short and round-ended: drops, not streaks. As large and as dark as the day page's
+        // nearer drops, so a wet day reads at a glance.
+        let style = StrokeStyle(lineWidth: 3.2, lineCap: .round)
         for level in 0..<Self.fades where !paths[level].isEmpty {
-            ctx.stroke(paths[level], with: .color(Theme.ink.opacity(0.22 * Double(level + 1) / Double(Self.fades))),
+            ctx.stroke(paths[level], with: .color(Theme.ink.opacity(0.34 * Double(level + 1) / Double(Self.fades))),
                        style: style)
         }
     }
@@ -489,7 +490,7 @@ private struct CellRain: View {
             paths[level].addEllipse(in: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2))
         }
         for level in 0..<Self.fades where !paths[level].isEmpty {
-            ctx.fill(paths[level], with: .color(Theme.ink.opacity(0.3 * Double(level + 1) / Double(Self.fades))))
+            ctx.fill(paths[level], with: .color(Theme.ink.opacity(0.4 * Double(level + 1) / Double(Self.fades))))
         }
     }
 

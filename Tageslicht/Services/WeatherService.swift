@@ -176,7 +176,7 @@ struct WeatherService: Sendable {
             .init(name: "latitude", value: String(c.lat)),
             .init(name: "longitude", value: String(c.lon)),
             .init(name: "models", value: "ecmwf_ec46"),
-            .init(name: "daily", value: "precipitation_sum,snowfall_sum"),
+            .init(name: "daily", value: "precipitation_sum,snowfall_sum,weather_code"),
             .init(name: "forecast_days", value: "46"),
             .init(name: "timezone", value: TimeZone.current.identifier),
         ]
@@ -202,7 +202,7 @@ struct WeatherService: Sendable {
                 return list.map { ($0 as? NSNumber)?.doubleValue }
             }
         }
-        let rain = series("precipitation_sum"), snow = series("snowfall_sum")
+        let rain = series("precipitation_sum"), snow = series("snowfall_sum"), codes = series("weather_code")
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = .current
@@ -212,11 +212,19 @@ struct WeatherService: Sendable {
             let amounts = rain.compactMap { i < $0.count ? $0[i] : nil }
             guard !amounts.isEmpty else { return nil }
             let snowy = snow.compactMap { i < $0.count ? $0[i] : nil }
-            return DayOutlook(day: Calendar.current.startOfDay(for: day),
-                              chance: Int((Double(amounts.filter { $0 >= WetDay.millimetres }.count) / Double(amounts.count) * 100).rounded()),
-                              millimetres: amounts.reduce(0, +) / Double(amounts.count),
-                              // snowfall_sum is in cm.
-                              snow: !snowy.isEmpty && snowy.filter { $0 >= 0.5 }.count * 2 > snowy.count)
+            let chance = Int((Double(amounts.filter { $0 >= WetDay.millimetres }.count) / Double(amounts.count) * 100).rounded())
+            // snowfall_sum is in cm.
+            let isSnow = !snowy.isEmpty && snowy.filter { $0 >= 0.5 }.count * 2 > snowy.count
+            // The most common weather among the members on the side the vote fell on.
+            let wet = chance >= WetDay.outlookChance
+            let votes = codes.compactMap { i < $0.count ? $0[i] : nil }.map { pictocode(wmo: Int($0)) }
+                .filter { WeatherKind(pictocode: $0).isWet == wet }
+            var tally: [Int: Int] = [:]
+            for v in votes { tally[v, default: 0] += 1 }
+            let picked = tally.max { ($0.value, $1.key) < ($1.value, $0.key) }?.key
+            return DayOutlook(day: Calendar.current.startOfDay(for: day), chance: chance,
+                              millimetres: amounts.reduce(0, +) / Double(amounts.count), snow: isSnow,
+                              pictocode: picked ?? (wet ? (isSnow ? 24 : 23) : 19))
         }
     }
 

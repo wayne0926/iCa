@@ -499,9 +499,19 @@ final class AppStore {
             // Not fetched yet: the phone's area stands in until it arrives.
             if started { Task { await fetchForecast(a, force: false) } }
             if let near = forecasts[here.area], a != here.area { apply(near, to: m, until: end) }
+            applyOutlook(a, to: m)
             return
         }
         apply(forecast, to: m, until: end)
+        applyOutlook(a, to: m)
+    }
+
+    /// A day past the hourly forecast still gets its weather in the header, from the
+    /// 46-day ensemble.
+    private func applyOutlook(_ a: Coordinate, to m: DayModel) {
+        guard m.hours.isEmpty, let o = (outlooks[a] ?? outlooks[here.area])?[m.day] else { return }
+        let s = DaySummary(outlook: o)
+        if s != m.summary { m.summary = s }
     }
 
     /// The month's likely wet days, each from its own place's forecast. Days not yet

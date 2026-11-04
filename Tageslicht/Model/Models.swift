@@ -68,6 +68,9 @@ struct DayOutlook: Hashable, Codable, Sendable {
     let millimetres: Double
     /// Most members fall as snow.
     let snow: Bool
+    /// The members' most common weather, as a meteoblue pictocode; wet exactly when the
+    /// day counts as wet (see `WetDay`), so the header and the month agree.
+    let pictocode: Int
 }
 
 struct SunTimes: Hashable, Sendable {
