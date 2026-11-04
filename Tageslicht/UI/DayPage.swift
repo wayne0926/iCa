@@ -27,6 +27,7 @@ struct DayPage: View {
     @State private var drivenY: CGFloat?
     @AppStorage("timelineZoom") private var zoom = TimelineZoom.standard.rawValue
     @AppStorage("timelineFullDay") private var fullDay = false
+    @AppStorage(DayTimeline.pinGridKey) private var pinGrid = false
 
     private var hourHeight: CGFloat { (TimelineZoom(rawValue: zoom) ?? .standard).hourHeight }
 
@@ -36,7 +37,7 @@ struct DayPage: View {
         ScrollView(.vertical) {
             DayTimeline(model: model, isToday: isToday, isActive: isActive,
                         hourHeight: hourHeight, fullDay: fullDay, blend: blend, onSelect: onSelect,
-                        extraBottom: blend == nil ? 0 : geo.height)
+                        extraBottom: blend == nil ? 0 : geo.height, pinGrid: pinGrid)
         }
         .scrollPosition($position)
         .scrollIndicators(.hidden)

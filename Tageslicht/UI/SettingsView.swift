@@ -8,6 +8,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var groups: [(source: String, calendars: [CalendarSource.Info])] = []
     @AppStorage(MonthColorStyle.key) private var colorStyle = MonthColorStyle.dot
+    @AppStorage(DayTimeline.pinGridKey) private var pinGrid = false
     @State private var calendarsOpen = false
 
     var body: some View {
@@ -21,6 +22,13 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
+                }
+                Section {
+                    Toggle("翻页时时间线不动", isOn: $pinGrid)
+                } header: {
+                    Text("日视图")
+                } footer: {
+                    Text("左右翻页时，整点横线和时刻留在原处，只有日程跟着翻过去。")
                 }
                 Section {
                     DisclosureGroup(isExpanded: $calendarsOpen) {

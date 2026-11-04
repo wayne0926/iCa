@@ -18,6 +18,10 @@ struct DayTimeline: View {
     /// Extra room below the day while a change animates, so the scroll offset is never
     /// clamped by a content height that is still catching up.
     let extraBottom: CGFloat
+    /// The hour lines and labels hold still on screen while the day pages under them.
+    var pinGrid = false
+    /// Settings: whether the grid holds still while paging.
+    static let pinGridKey = "timelinePinGrid"
 
     var body: some View {
         let target = Self.scale(for: model, isToday: isToday, hourHeight: hourHeight, fullDay: fullDay)
@@ -26,22 +30,34 @@ struct DayTimeline: View {
         let now = Date()
         let hours = Int(Self.dayHours(model.day).rounded())
         // Everything is a positioned view: an animation frame only moves layers, it never
-        // repaints the day. The order below is the drawing order.
+        // repaints the day. The order below is the drawing order: the hour grid, then the day.
+        ZStack(alignment: .topLeading) {
+            TimelineLayout(scale: scale, extraBottom: extraBottom) {
+                ForEach(0...hours, id: \.self) { i in
+                    Rectangle()
+                        .fill(Theme.hairline)
+                        .opacity(scale.gridWeight(Double(i)))
+                        .layoutValue(key: Slot.self, value: .rule(Double(i)))
+                }
+                ForEach(0..<hours, id: \.self) { i in
+                    Text(Fmt.hour(model.day.addingTimeInterval(Double(i) * 3600)))
+                        .font(Theme.hourLabel)
+                        .foregroundStyle(Theme.hourInk)
+                        .fixedSize()
+                        .opacity(scale.gridWeight(Double(i), label: true))
+                        .layoutValue(key: Slot.self, value: .label(Double(i)))
+                }
+            }
+            .modifier(PinnedToScreen(on: pinGrid))
+            dayLayer(scale: scale, wet: wet, now: now)
+        }
+        .overlay(alignment: .topLeading) {
+            if isToday { NowLine(day: model.day, scale: scale) }
+        }
+    }
+
+    private func dayLayer(scale: ScaleBlend, wet: [PrecipSpan], now: Date) -> some View {
         TimelineLayout(scale: scale, extraBottom: extraBottom) {
-            ForEach(0...hours, id: \.self) { i in
-                Rectangle()
-                    .fill(Theme.hairline)
-                    .opacity(scale.gridWeight(Double(i)))
-                    .layoutValue(key: Slot.self, value: .rule(Double(i)))
-            }
-            ForEach(0..<hours, id: \.self) { i in
-                Text(Fmt.hour(model.day.addingTimeInterval(Double(i) * 3600)))
-                    .font(Theme.hourLabel)
-                    .foregroundStyle(Theme.hourInk)
-                    .fixedSize()
-                    .opacity(scale.gridWeight(Double(i), label: true))
-                    .layoutValue(key: Slot.self, value: .label(Double(i)))
-            }
             ForEach(sunMarks, id: \.symbol) { mark in
                 Rectangle()
                     .fill(Theme.sunRule)
@@ -70,9 +86,6 @@ struct DayTimeline: View {
                 RainLayer(span: span, index: i, active: isActive, plane: .inFront)
                     .layoutValue(key: Slot.self, value: .band(span.start, span.end))
             }
-        }
-        .overlay(alignment: .topLeading) {
-            if isToday { NowLine(day: model.day, scale: scale) }
         }
     }
 
@@ -104,6 +117,25 @@ struct DayTimeline: View {
     static func dayHours(_ day: Date) -> Double {
         let end = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? day.addingTimeInterval(86400)
         return end.timeIntervalSince(day) / 3600
+    }
+}
+
+/// Takes back the page's sideways slide, so the grid stays where it is on screen while the
+/// page moves under it. The page's own scroll view clips it to the page: mid-swipe each
+/// page shows its own grid over its own part of the screen, and where both days have the
+/// same hours (they're lined up before a swipe) the two halves meet as one grid. Applied
+/// as the frame is drawn, so the swipe never redraws or lays out anything.
+private struct PinnedToScreen: ViewModifier {
+    let on: Bool
+
+    func body(content: Content) -> some View {
+        if on {
+            content.visualEffect { content, proxy in
+                content.offset(x: -proxy.frame(in: .scrollView(axis: .horizontal)).minX)
+            }
+        } else {
+            content
+        }
     }
 }
 
