@@ -22,6 +22,8 @@ struct DayTimeline: View {
     var pinGrid = false
     /// Settings: whether the grid holds still while paging.
     static let pinGridKey = "timelinePinGrid"
+    /// Where a held-still sun ball is drawn; nil outside the pager.
+    @Environment(SunTrack.self) private var sunTrack: SunTrack?
 
     var body: some View {
         let target = Self.scale(for: model, isToday: isToday, hourHeight: hourHeight, fullDay: fullDay)
@@ -77,10 +79,20 @@ struct DayTimeline: View {
                     .layoutValue(key: Slot.self, value: .band(span.start, span.end))
             }
             // Last, so a ball is never under a card it has stepped aside from, and its tap
-            // never reaches the card.
+            // never reaches the card. With the grid held still the ball is held still too:
+            // the page only marks where it belongs, and the pager draws it above the pages.
             ForEach(sunMarks, id: \.rising) { mark in
-                SunBall(date: mark.date, rising: mark.rising)
-                    .layoutValue(key: Slot.self, value: .sun(mark.hour))
+                if pinGrid, let sunTrack {
+                    let key = SunTrack.Key(day: model.day, rising: mark.rising)
+                    Color.clear
+                        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(SunTrack.space)).midY } action: { y in
+                            sunTrack.marks[key] = SunTrack.Mark(y: y, date: mark.date)
+                        }
+                        .layoutValue(key: Slot.self, value: .sunMark(mark.hour))
+                } else {
+                    SunBall(date: mark.date, rising: mark.rising)
+                        .layoutValue(key: Slot.self, value: .sun(mark.hour))
+                }
             }
         }
     }
@@ -140,7 +152,7 @@ private struct PinnedToScreen: ViewModifier {
 struct Slot: LayoutValueKey {
     enum Kind: Equatable {
         case card(column: Int, columns: Int)
-        case rule, label, sun, band
+        case rule, label, sun, sunMark, band
     }
 
     static let defaultValue = Slot(kind: .rule, start: 0, end: 0)
@@ -154,6 +166,8 @@ struct Slot: LayoutValueKey {
     static func rule(_ h: Double) -> Slot { Slot(kind: .rule, start: h, end: h) }
     static func label(_ h: Double) -> Slot { Slot(kind: .label, start: h, end: h) }
     static func sun(_ h: Double) -> Slot { Slot(kind: .sun, start: h, end: h) }
+    /// Where a sun ball drawn by the pager belongs: same spot, nothing drawn.
+    static func sunMark(_ h: Double) -> Slot { Slot(kind: .sunMark, start: h, end: h) }
     static func band(_ start: Double, _ end: Double) -> Slot { Slot(kind: .band, start: start, end: end) }
 }
 
@@ -196,13 +210,18 @@ struct TimelineLayout: Layout {
             case .label:
                 v.place(at: CGPoint(x: bounds.minX + Theme.gutter - 6, y: y(s.start)), anchor: .trailing,
                         proposal: .unspecified)
-            case .sun:
+            case .sun, .sunMark:
                 let clear = SunBall.size / 2 + 4
                 let cy = Self.free(near: y(s.start), taken: taken, clear: clear,
                                    floor: bounds.minY + clear)
-                // The view carries its own invisible tap margin on every side.
-                v.place(at: CGPoint(x: bounds.maxX - SunBall.edge + SunBall.hitMargin, y: cy),
-                        anchor: .trailing, proposal: .unspecified)
+                if s.kind == .sun {
+                    // The view carries its own invisible tap margin on every side.
+                    v.place(at: CGPoint(x: bounds.maxX - SunBall.edge + SunBall.hitMargin, y: cy),
+                            anchor: .trailing, proposal: .unspecified)
+                } else {
+                    v.place(at: CGPoint(x: bounds.maxX - SunBall.edge - SunBall.size / 2, y: cy),
+                            anchor: .center, proposal: ProposedViewSize(width: SunBall.size, height: SunBall.size))
+                }
             case .band:
                 let m = RainLayer.margin
                 let top = y(s.start) - m
@@ -257,9 +276,67 @@ struct TimelineLayout: Layout {
 
 // MARK: - Sun
 
+/// Where the pages want their sun balls, for the pager to draw them above the pages when
+/// the grid is held still. Written as the pages move; read only by `SunOverlay`, so only
+/// the balls redraw.
+@MainActor @Observable final class SunTrack {
+    struct Key: Hashable {
+        let day: Date
+        let rising: Bool
+    }
+    struct Mark: Equatable {
+        var y: CGFloat
+        var date: Date
+    }
+    static let space = "dayPager"
+
+    /// Centre of each page's ball, in the pager's coordinates.
+    var marks: [Key: Mark] = [:]
+    /// The pager's position in pages: 2.4 is 40% of the way from the third day to the fourth.
+    var position: CGFloat = 0
+}
+
+/// The sun balls held still on screen while the days page under them: each glides up or
+/// down from where one day has it to where the next does, as far as the swipe has gone.
+struct SunOverlay: View {
+    let track: SunTrack
+    let days: [Date]
+
+    var body: some View {
+        let p = max(0, track.position)
+        let i = Int(p.rounded(.down))
+        let f = p - CGFloat(i)
+        ZStack(alignment: .topTrailing) {
+            ForEach([true, false], id: \.self) { rising in
+                if let m = mark(rising: rising, page: i, fraction: f) {
+                    SunBall(date: m.date, rising: rising)
+                        .offset(x: SunBall.hitMargin - SunBall.edge,
+                                y: m.y - SunBall.size / 2 - SunBall.hitMargin)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .clipped()
+    }
+
+    private func mark(rising: Bool, page i: Int, fraction f: CGFloat) -> SunTrack.Mark? {
+        func at(_ j: Int) -> SunTrack.Mark? {
+            days.indices.contains(j) ? track.marks[SunTrack.Key(day: days[j], rising: rising)] : nil
+        }
+        let a = at(i), b = f > 0.001 ? at(i + 1) : nil
+        switch (a, b) {
+        case let (a?, b?):
+            return SunTrack.Mark(y: a.y + (b.y - a.y) * f, date: f < 0.5 ? a.date : b.date)
+        case let (a?, nil): return a
+        case let (nil, b?): return b
+        default: return nil
+        }
+    }
+}
+
 /// Sunrise or sunset: a small, quiet ball at the right edge, near its hour. A tap slides
 /// the time out to its left; it folds back by itself a few seconds later.
-private struct SunBall: View {
+struct SunBall: View {
     let date: Date
     let rising: Bool
     @State private var open = false
@@ -276,12 +353,14 @@ private struct SunBall: View {
             if open {
                 Text(date.formatted(Fmt.time))
                     .font(Theme.mark)
-                    .foregroundStyle(Theme.sun)
+                    .foregroundStyle(Theme.graphite)
                     .fixedSize()
+                    .contentTransition(.numericText())
+                    .animation(.snappy(duration: 0.3), value: date)
                     .transition(.opacity.combined(with: .offset(x: 8)))
             }
             SunGlyph(rising: rising)
-                .stroke(Theme.sun, style: StrokeStyle(lineWidth: 1.9, lineCap: .round, lineJoin: .round))
+                .stroke(Theme.graphite, style: StrokeStyle(lineWidth: 1.9, lineCap: .round, lineJoin: .round))
                 .frame(width: Self.glyph, height: Self.glyph)
         }
         // Closed it is exactly a circle; open, it grows to the left only, so the glyph

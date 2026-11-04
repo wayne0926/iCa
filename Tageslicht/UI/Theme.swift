@@ -31,10 +31,9 @@ enum Theme {
     static let shadow = Color(UIColor { $0.userInterfaceStyle == .dark ? .clear : UIColor.black.withAlphaComponent(0.12) })
     /// Daylight: sunrise/sunset, clear sky.
     static let sun = dynamic(light: (0.91, 0.58, 0.13), dark: (0.95, 0.70, 0.36))
-    /// The sunrise/sunset ball: a faint wash of the sun's colour, just enough to hold its glyph.
+    /// The sunrise/sunset ball: a faint grey disc, just enough to hold its glyph.
     static let sunBall = Color(UIColor { t in
-        t.userInterfaceStyle == .dark ? UIColor(red: 0.95, green: 0.70, blue: 0.36, alpha: 0.16)
-                                      : UIColor(red: 0.91, green: 0.58, blue: 0.13, alpha: 0.13)
+        t.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.12) : UIColor(white: 0, alpha: 0.06)
     })
     /// Rain: wet hours, and trips moved onto transit because of it.
     static let rain = dynamic(light: (0.16, 0.47, 0.84), dark: (0.40, 0.66, 0.96))

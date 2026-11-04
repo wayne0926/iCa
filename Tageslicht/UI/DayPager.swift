@@ -22,6 +22,9 @@ struct DayPager: View {
     @State private var closing = false
     /// The moment the reader is looking at, shared by every page so paging keeps hours level.
     @State private var anchor: TimeAnchor?
+    /// With the grid held still, the sun balls are held still too, drawn here above the pages.
+    @State private var sunTrack = SunTrack()
+    @AppStorage(DayTimeline.pinGridKey) private var pinGrid = false
 
     private let today = Calendar.current.startOfDay(for: Date())
     private let days: [Date]
@@ -90,7 +93,9 @@ struct DayPager: View {
             }
             .scrollTargetLayout()
         }
+        .coordinateSpace(.named(SunTrack.space))
         .environment(activity)
+        .environment(sunTrack)
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: $selection)
         .scrollIndicators(.hidden)
@@ -112,6 +117,16 @@ struct DayPager: View {
                 show(s)
                 onDayChange(s)
             }
+        }
+        // How far the swipe has gone, for the held-still sun balls. Only they read it.
+        .onScrollGeometryChange(for: CGFloat.self) { g in
+            let width = g.containerSize.width
+            return width > 0 ? (g.contentOffset.x + g.contentInsets.leading) / width : 0
+        } action: { _, p in
+            sunTrack.position = p
+        }
+        .overlay {
+            if pinGrid { SunOverlay(track: sunTrack, days: days) }
         }
         .overlay(alignment: .bottomTrailing) {
             if let s = selection, s != today {
