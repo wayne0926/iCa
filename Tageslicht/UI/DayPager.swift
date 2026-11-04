@@ -279,6 +279,14 @@ private struct WeatherGlyph: View {
     let kind: WeatherKind
 
     private static let motion = Animation.smooth(duration: 0.5)
+
+    /// For what falls from the cloud: coming, it waits until whatever was there before has
+    /// gone back up (`leave`); leaving, it goes at once. Together they take as long as the
+    /// cloud's own move.
+    private static func turn(_ coming: Bool) -> Animation {
+        coming ? .smooth(duration: 0.32).delay(0.18) : leave
+    }
+    private static let leave = Animation.easeIn(duration: 0.18)
     private static let size = CGSize(width: 30, height: 26)
     /// The symbols' semibold stroke at 17 pt.
     private static let stroke = StrokeStyle(lineWidth: 1.9, lineCap: .round, lineJoin: .round)
@@ -336,19 +344,25 @@ private struct WeatherGlyph: View {
                 .opacity(sun == .gone ? 0 : 1)
             // What falls from the cloud hangs from it: it moves with the cloud, and leaves by
             // going back up into it.
+            // One thing gives way to another in turn, never through each other: what leaves
+            // goes back into the cloud quickly, what comes waits a moment, then comes out.
             Group {
                 Drops(length: drops, out: raining ? 1 : 0)
                     .stroke(style: Self.stroke)
                     .opacity(raining ? 1 : 0)
+                    .animation(Self.turn(raining), value: raining)
                 Flakes(rows: AnimatablePair(flakes.0, flakes.1))
+                    .animation(Self.turn(flakes.0 + flakes.1 > 0), value: flakes.0 * 2 + flakes.1)
                 Mist(amount: fog)
                     .stroke(style: Self.stroke)
                     .opacity(fog)
+                    .animation(Self.turn(fog > 0), value: fog)
                 Image(systemName: "bolt.fill")
                     .font(.system(size: 10, weight: .semibold))
                     .scaleEffect(bolt ? 1 : 0.5, anchor: .top)
                     .offset(y: bolt ? 8 : 2)
                     .opacity(bolt ? 1 : 0)
+                    .animation(Self.turn(bolt), value: bolt)
             }
             .frame(width: Self.size.width, height: Self.size.height)
             .offset(x: place.x, y: place.y + CloudPlace.rise)
