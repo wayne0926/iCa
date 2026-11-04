@@ -397,9 +397,12 @@ struct SunshineLayer: View {
                                        .init(color: .black, location: 1 - m), .init(color: .clear, location: 1)],
                                startPoint: .top, endPoint: .bottom)
                     .mask {
+                        // Soft towards the hour labels, and towards the page's own right edge:
+                        // while paging, that edge crosses the screen, and must not show as a cut.
                         let w = min(0.4, Theme.gutter * 1.2 / max(g.size.width, 1))
+                        let e = min(0.3, 48 / max(g.size.width, 1))
                         LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: w),
-                                               .init(color: .black, location: 1)],
+                                               .init(color: .black, location: 1 - e), .init(color: .clear, location: 1)],
                                        startPoint: .leading, endPoint: .trailing)
                     }
             }
