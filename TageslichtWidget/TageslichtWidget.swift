@@ -217,9 +217,17 @@ enum Ink {
     static let paper = Color(UIColor { t in
         t.userInterfaceStyle == .dark ? .black : UIColor(red: 0.949, green: 0.949, blue: 0.969, alpha: 1)
     })
-    static let graphite = Color(.label).opacity(0.62)
-    static let hairline = Color(.label).opacity(0.16)
-    static let hourInk = Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.72) : .label })
+    // A step brighter than the app's on the dark page: small type on a small black
+    // square, seen from arm's length on the home screen, needs more contrast than the
+    // same type inside the app.
+    static let ink = Color(UIColor { $0.userInterfaceStyle == .dark ? .white : .black })
+    static let graphite = Color(UIColor { t in
+        t.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.8) : UIColor(white: 0, alpha: 0.66)
+    })
+    static let hairline = Color(UIColor { t in
+        t.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.24) : UIColor(white: 0, alpha: 0.18)
+    })
+    static let hourInk = Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.9) : .black })
     static let now = Color(UIColor { t in
         t.userInterfaceStyle == .dark ? UIColor(red: 1, green: 0.42, blue: 0.40, alpha: 1)
                                       : UIColor(red: 0.90, green: 0.26, blue: 0.24, alpha: 1)
@@ -234,7 +242,8 @@ enum Ink {
             guard t.userInterfaceStyle == .dark else { return .white }
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             lifted(e).getRed(&r, green: &g, blue: &b, alpha: &a)
-            let base: CGFloat = 0.11, k: CGFloat = 0.2
+            // A little lighter than the app's cards, so they stand off the black page.
+            let base: CGFloat = 0.15, k: CGFloat = 0.22
             return UIColor(red: base + (r - base) * k, green: base + (g - base) * k, blue: base + (b - base) * k, alpha: 1)
         })
     }
@@ -281,7 +290,7 @@ struct TimelineWidgetView: View {
                 MiniTimeline(plan: p, now: entry.date)
             }
         }
-        .foregroundStyle(Color(.label))
+        .foregroundStyle(Ink.ink)
     }
 
     private func monthDay(_ d: Date) -> String {
@@ -406,7 +415,7 @@ private struct Block: View {
         .padding(.trailing, 4)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Ink.card(event), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .opacity(past ? 0.55 : 1)
+        .opacity(past ? 0.6 : 1)
     }
 
     private var detail: String {
