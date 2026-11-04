@@ -26,6 +26,18 @@ struct RootView: View {
     @Environment(AppStore.self) private var store
 
     var body: some View {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-zoomProbe") {
+            ZoomProbe()
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
+    }
+
+    @ViewBuilder private var content: some View {
         switch store.access {
         case .denied:
             AccessDeniedView()
@@ -34,6 +46,67 @@ struct RootView: View {
         }
     }
 }
+
+#if DEBUG
+/// Launch with `-zoomProbe`: the system zoom with nothing of the app around it, one row per
+/// way of marking the source. A row whose pages open from and close into the middle of the
+/// screen marks its source in a way this system doesn't find.
+///   A: the visible square itself (Apple's own pattern)
+///   B: an empty Color.clear behind the square (what the app does)
+///   C: a nearly invisible colour behind the square
+private struct ZoomProbe: View {
+    private struct Item: Hashable { let row: Int; let col: Int }
+    @Namespace private var ns
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 28) {
+                ForEach(0..<3, id: \.self) { row in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(["A  visible square", "B  Color.clear behind", "C  opacity 0.001 behind"][row])
+                            .font(.headline)
+                        HStack(spacing: 12) {
+                            ForEach(0..<4, id: \.self) { col in
+                                NavigationLink(value: Item(row: row, col: col)) { cell(row: row, col: col) }
+                                    .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                Text(Self.versionLine).font(.footnote).foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(20)
+            .navigationTitle("Zoom probe")
+            .navigationDestination(for: Item.self) { item in
+                Color(hue: Double(item.col) / 4, saturation: 0.5, brightness: 0.9)
+                    .overlay(Text("\(["A", "B", "C"][item.row])\(item.col + 1)").font(.largeTitle.bold()))
+                    .ignoresSafeArea()
+                    .navigationTransition(.zoom(sourceID: item, in: ns))
+            }
+        }
+    }
+
+    @ViewBuilder private func cell(row: Int, col: Int) -> some View {
+        let square = RoundedRectangle(cornerRadius: 10)
+            .fill(Color(hue: Double(col) / 4, saturation: 0.5, brightness: 0.9))
+            .frame(width: 64, height: 64)
+        let id = Item(row: row, col: col)
+        switch row {
+        case 0: square.matchedTransitionSource(id: id, in: ns)
+        case 1: square.background { Color.clear.matchedTransitionSource(id: id, in: ns) }
+        default: square.background { Color.black.opacity(0.001).matchedTransitionSource(id: id, in: ns) }
+        }
+    }
+
+    private static let versionLine: String = {
+        let info = Bundle.main.infoDictionary
+        let v = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let b = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(v) (\(b)) · iOS \(UIDevice.current.systemVersion)"
+    }()
+}
+#endif
 
 /// Year → months → day, each opening out of the one below with the system zoom, as in
 /// iOS Calendar. The app starts on the months (or the year, if that's where it was left).
