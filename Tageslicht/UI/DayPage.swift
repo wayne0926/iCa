@@ -5,6 +5,9 @@ import SwiftUI
 struct TimeAnchor: Equatable {
     let hour: Double
     let screenY: CGFloat
+    /// The reader is at the start of the day, not somewhere in it: the next day then opens
+    /// at its own start too, its earliest events in view, rather than at the same hour.
+    var atStart = false
 }
 
 struct DayPage: View {
@@ -98,12 +101,17 @@ struct DayPage: View {
         guard isActive, didAppear, blend == nil, geo.height > 0 else { return }
         let lead = geo.height / 3
         let hour = currentScale.hour(atY: geo.offset + lead - Theme.topInset)
-        let next = TimeAnchor(hour: hour, screenY: geo.top + lead)
+        let atStart = geo.offset < 1 || abs(geo.offset - startY()) < 6
+        let next = TimeAnchor(hour: hour, screenY: geo.top + lead, atStart: atStart)
         if next != anchor { anchor = next }
     }
 
     private func align(to a: TimeAnchor) {
-        position.scrollTo(y: max(0, currentScale.y(a.hour) + Theme.topInset - (a.screenY - geo.top)))
+        if a.atStart {
+            position.scrollTo(y: startY())
+        } else {
+            position.scrollTo(y: max(0, currentScale.y(a.hour) + Theme.topInset - (a.screenY - geo.top)))
+        }
         didScroll = true
     }
 
@@ -163,7 +171,14 @@ struct DayPage: View {
     /// opens at its first event or 8:00, whichever is earlier.
     private func scrollToStart() {
         guard !didScroll else { return }
-        let scale = DayTimeline.scale(for: model, isToday: isToday, hourHeight: hourHeight, fullDay: fullDay)
+        position.scrollTo(y: startY())
+        didScroll = true
+    }
+
+    /// Where the day starts: today at "now", a full day at its first event or 8:00, a
+    /// folded day at the top, which is just above its first event.
+    private func startY() -> CGFloat {
+        let scale = currentScale
         let y: CGFloat
         if isToday {
             y = scale.y(Date().timeIntervalSince(model.day) / 3600) - 120
@@ -172,7 +187,6 @@ struct DayPage: View {
         } else {
             y = 0
         }
-        position.scrollTo(y: max(0, y))
-        didScroll = true
+        return max(0, y)
     }
 }
