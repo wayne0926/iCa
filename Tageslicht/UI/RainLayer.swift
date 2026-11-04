@@ -15,14 +15,13 @@ import SwiftUI
 /// page in view, at most 60 times a second even on a 120 Hz screen, and stops under
 /// Reduce Motion and in Low Power Mode, where the shower stands still.
 ///
-/// The shower hangs on the page by springs. Each depth of drops falls through its own
-/// pocket of air, tied to the page by an underdamped spring: when the page moves, the
-/// drops trail behind it; when it stops, they swing past, back, and settle, so a swipe to
-/// and fro sets the shower swaying. Far drops swing slower and less than near ones, and
-/// the bottom of the screen a beat after the top, so it bends like a curtain rather than
-/// sliding as one sheet. A drop leans along its swing and stretches with it.
+/// The shower has inertia (see `Sway`): a page starting, stopping or turning sets the
+/// drops swinging a moment later, a page gliding evenly leaves them be, and a swipe to and
+/// fro keeps them swaying. Far drops swing slower and less than near ones, and the bottom
+/// of the screen a beat after the top, so it bends like a curtain rather than sliding as
+/// one sheet. A drop tilts with its swing.
 ///
-/// Only the shower's place on screen is tracked, outside any view state; the springs step
+/// Only the shower's place on screen is tracked, outside any view state; the swing steps
 /// as a frame is drawn, a few multiplications per depth. While the pager is moving, the
 /// pages beside the one in view fall too, so the one arriving already sways.
 /// Whether the day pager is moving. Only the rain reads it, so a swipe starting or ending
@@ -87,38 +86,51 @@ struct RainLayer: View {
         }
     }
 
-    /// The springs the shower hangs by. Written as the page moves, stepped as a frame is
-    /// drawn; not observed, so it redraws nothing.
+    /// What the shower hangs by. Written as the page moves, stepped as a frame is drawn;
+    /// not observed, so it redraws nothing.
+    ///
+    /// Inertia, not a rubber band: the drops answer the page's change of speed, never its
+    /// position or its speed as such. A page gliding evenly carries them along untouched,
+    /// as a smoothly moving train carries a hanging lamp. When it starts, stops or turns,
+    /// they lag, gather, swing past and settle, and all of that grows from nothing over a
+    /// fraction of a second rather than jumping at the first touch:
+    ///  - the page's motion first passes through a short, critically damped smoothing,
+    ///    the give of the air it carries, so even a sudden start reaches the drops as a
+    ///    build-up, never a jolt, and its acceleration comes out of the smoothing itself
+    ///    instead of from differencing noisy samples;
+    ///  - each depth hangs from that air as a lightly damped pendulum in a moving frame,
+    ///    x'' = -w^2 x - 2 zeta w x' - a, whose swing starts at rest and only builds as
+    ///    the acceleration acts on it.
     private final class Sway {
         /// The shower's place on screen, from the layout.
         var origin: CGPoint = .zero
         private var last: CGPoint?
         private var lastTime: Double = 0
-        /// Per depth, one spring at the top of the screen and one at the bottom.
-        private var springs: [Spring] = (0..<RainLayer.depths).flatMap { d -> [Spring] in
+        /// The air the drops fall through: the page's motion, smoothed.
+        private var air: CGPoint = .zero
+        private var airSpeed: CGVector = .zero
+        /// How quickly the air takes up the page's motion, rad/s (critically damped).
+        private static let give: CGFloat = 16
+        /// Per depth, one pendulum at the top of the screen and one at the bottom.
+        private var pendulums: [Pendulum] = (0..<RainLayer.depths).flatMap { d -> [Pendulum] in
             let near = (Double(d) + 0.5) / Double(RainLayer.depths)
-            // Near air is light and quick, far air slow; the bottom trails the top.
-            let duration = 0.95 - 0.3 * near
-            return [Spring(duration: duration, bounce: 0.68), Spring(duration: duration * 1.3, bounce: 0.64)]
+            // Heavier, slower far drops; the bottom of the screen a beat behind the top.
+            let period = 1.25 - 0.35 * near
+            return [Pendulum(period: period, damping: 0.2), Pendulum(period: period * 1.25, damping: 0.18)]
         }
         private(set) var frame = Frame.rest
 
         /// What a frame draws with: per depth, how far the drops are carried off at the top
-        /// and at the bottom of the screen, and how fast.
+        /// and at the bottom of the screen.
         struct Frame {
             var offset: [CGVector]
-            var velocity: [CGVector]
-            static let rest = Frame(offset: Array(repeating: .zero, count: RainLayer.depths * 2),
-                                    velocity: Array(repeating: .zero, count: RainLayer.depths * 2))
+            static let rest = Frame(offset: Array(repeating: .zero, count: RainLayer.depths * 2))
 
-            /// At a given height on screen, between the top spring and the bottom one.
-            func at(depth: Int, screenY: CGFloat) -> (offset: CGVector, velocity: CGVector) {
+            /// At a given height on screen, between the top pendulum and the bottom one.
+            func at(depth: Int, screenY: CGFloat) -> CGVector {
                 let w = min(1, max(0, screenY / 900))
-                let a = depth * 2, b = a + 1
-                return (CGVector(dx: offset[a].dx + (offset[b].dx - offset[a].dx) * w,
-                                 dy: offset[a].dy + (offset[b].dy - offset[a].dy) * w),
-                        CGVector(dx: velocity[a].dx + (velocity[b].dx - velocity[a].dx) * w,
-                                 dy: velocity[a].dy + (velocity[b].dy - velocity[a].dy) * w))
+                let a = offset[depth * 2], b = offset[depth * 2 + 1]
+                return CGVector(dx: a.dx + (b.dx - a.dx) * w, dy: a.dy + (b.dy - a.dy) * w)
             }
         }
 
@@ -126,75 +138,63 @@ struct RainLayer: View {
             guard t > lastTime else { return }
             let dt = t - lastTime
             defer { last = origin; lastTime = t }
-            guard let from = last else { return }
-            // Back after a pause: the air keeps the swing it had, and picks up from where
-            // the page is now, at rest.
-            if dt > 0.1 {
-                for i in springs.indices { springs[i].resume(page: origin) }
+            // First frame, or back after a pause: the air settles where the page is, and
+            // the drops keep the swing they had but none of its speed.
+            guard let from = last, dt <= 0.1 else {
+                air = origin
+                airSpeed = .zero
+                for i in pendulums.indices { pendulums[i].speed = .zero }
                 return
             }
-            // Fine steps, the page moving evenly between the two samples, so a stiff spring
-            // stays steady at any frame rate.
+            // Fine steps, the page moving evenly between the two samples, so the result is
+            // the same at any frame rate.
             let n = max(1, Int((dt * 240).rounded(.up)))
-            let h = dt / Double(n)
+            let h = CGFloat(dt / Double(n))
+            let g = Self.give
             for k in 1...n {
                 let f = CGFloat(k) / CGFloat(n)
                 let page = CGPoint(x: from.x + (origin.x - from.x) * f, y: from.y + (origin.y - from.y) * f)
-                for i in springs.indices { springs[i].step(toward: page, dt: h) }
+                let accel = CGVector(dx: g * g * (page.x - air.x) - 2 * g * airSpeed.dx,
+                                     dy: g * g * (page.y - air.y) - 2 * g * airSpeed.dy)
+                airSpeed.dx += accel.dx * h
+                airSpeed.dy += accel.dy * h
+                air.x += airSpeed.dx * h
+                air.y += airSpeed.dy * h
+                for i in pendulums.indices { pendulums[i].step(frameAccel: accel, dt: h) }
             }
-            for i in springs.indices {
-                let depth = i / 2
-                let near = (CGFloat(depth) + 0.5) / CGFloat(RainLayer.depths)
-                // Soft limits: a hard swipe drags the drops a bounded way, a small one a
-                // proportionate way, and nothing ever stops dead at a wall.
-                let new = springs[i].shown(reachX: 5 + 12 * near, reachY: 3 + 7 * near)
-                let old = frame.offset[i]
-                let raw = CGVector(dx: (new.dx - old.dx) / dt, dy: (new.dy - old.dy) / dt)
-                let e = CGFloat(1 - exp(-dt / 0.04))
-                frame.velocity[i].dx += (raw.dx - frame.velocity[i].dx) * e
-                frame.velocity[i].dy += (raw.dy - frame.velocity[i].dy) * e
-                frame.offset[i] = new
+            for i in pendulums.indices {
+                let near = (CGFloat(i / 2) + 0.5) / CGFloat(RainLayer.depths)
+                frame.offset[i] = pendulums[i].shown(reachX: 6 + 12 * near, reachY: 3 + 6 * near)
             }
         }
     }
 
-    /// A pocket of air tied to the page: stiffness and damping from a duration and a
-    /// bounce, the way SwiftUI's own springs are made (mass 1). The drag on it is the air's
-    /// own, so a steady scroll holds the drops a little behind, and a stop lets them swing.
-    private struct Spring {
-        let stiffness: CGFloat
-        let damping: CGFloat
-        var air: CGPoint?
+    /// A drop hanging in the moving air: a damped pendulum seen from the frame that moves,
+    /// so the frame's acceleration is the only force that sets it going.
+    private struct Pendulum {
+        let w: CGFloat
+        let zeta: CGFloat
+        var lag: CGVector = .zero
         var speed: CGVector = .zero
-        /// Where the air sat against the page when the clock last stopped.
-        var held: CGVector = .zero
 
-        init(duration: Double, bounce: Double) {
-            stiffness = CGFloat(pow(2 * .pi / duration, 2))
-            damping = CGFloat(4 * .pi * (1 - bounce) / duration)
+        init(period: Double, damping: Double) {
+            w = CGFloat(2 * .pi / period)
+            zeta = CGFloat(damping)
         }
 
-        mutating func step(toward page: CGPoint, dt: Double) {
-            var a = air ?? page
-            let h = CGFloat(dt)
-            speed.dx += (stiffness * (page.x - a.x) - damping * speed.dx) * h
-            speed.dy += (stiffness * (page.y - a.y) - damping * speed.dy) * h
-            a.x += speed.dx * h
-            a.y += speed.dy * h
-            air = a
-            held = CGVector(dx: a.x - page.x, dy: a.y - page.y)
+        mutating func step(frameAccel a: CGVector, dt h: CGFloat) {
+            speed.dx += (-w * w * lag.dx - 2 * zeta * w * speed.dx - a.dx) * h
+            speed.dy += (-w * w * lag.dy - 2 * zeta * w * speed.dy - a.dy) * h
+            lag.dx += speed.dx * h
+            lag.dy += speed.dy * h
         }
 
-        mutating func resume(page: CGPoint) {
-            air = CGPoint(x: page.x + held.dx, y: page.y + held.dy)
-            speed = .zero
-        }
-
-        /// The drift on screen: the air's lag, softly bounded.
+        /// The drift on screen, softly bounded: a hard flick drags the drops a bounded way,
+        /// a light one a proportionate way, and nothing stops dead at a wall.
         func shown(reachX: CGFloat, reachY: CGFloat) -> CGVector {
-            let gain: CGFloat = 0.14
-            return CGVector(dx: reachX * tanh(gain * held.dx / reachX),
-                            dy: reachY * tanh(gain * held.dy / reachY))
+            let gain: CGFloat = 0.13
+            return CGVector(dx: reachX * tanh(gain * lag.dx / reachX),
+                            dy: reachY * tanh(gain * lag.dy / reachY))
         }
     }
 
@@ -282,13 +282,13 @@ struct RainLayer: View {
             let speed = baseSpeed * (0.55 + 0.6 * near) * (0.85 + 0.3 * cycleRand(b.index, i, c, 2))
             let y0 = b.top - Self.wander * 0.5 + CGFloat(cycleRand(b.index, i, c, 5)) * (height + Self.wander)
             let fall = CGFloat(speed * local)
-            // Carried off by its swing, a little more or less than its neighbours; leaning
-            // along the way it moves through the page, stretched when it swings down.
-            let (off, vel) = v.at(depth: depth, screenY: top + y0 + fall)
+            // Carried off by its swing, a little more or less than its neighbours, and
+            // tilted the way a hanging thing tilts when it swings out: by how far, not how
+            // fast, so the tilt grows and fades with the swing instead of snapping.
+            let off = v.at(depth: depth, screenY: top + y0 + fall)
             let give = CGFloat(0.8 + 0.4 * rand(b.index, i, 11))
-            let s = CGFloat(speed)
-            let down = max(0.7, min(1.6, (s + vel.dy * give) / s))
-            let lean = slant - max(-0.5, min(0.5, vel.dx * give / s))
+            let down = max(0.75, min(1.4, 1 + off.dy * give / 30))
+            let lean = slant - max(-0.45, min(0.45, off.dx * give / 36))
             let length = CGFloat(6 + 7 * near) * CGFloat(0.8 + 0.4 * cycleRand(b.index, i, c, 7)) * down
             let y = y0 + fall + off.dy * give
             let x = f.left + CGFloat(cycleRand(b.index, i, c, 4)) * f.width - fall * slant + off.dx * give
@@ -328,7 +328,7 @@ struct RainLayer: View {
             let travel = Double(bottom - top + r * 2)
             let fallen = top - r + CGFloat((rand(b.index, i, 3) * travel + t * speed).truncatingRemainder(dividingBy: travel))
             // Flakes are light: they swing further than drops.
-            let off = v.at(depth: depth, screenY: sway.origin.y + fallen).offset
+            let off = v.at(depth: depth, screenY: sway.origin.y + fallen)
             let give = CGFloat(1.1 + 0.5 * rand(b.index, i, 11))
             let y = fallen + off.dy * give
             let drift = CGFloat(4 + 4 * near) * CGFloat(sin(t * 1.1 + rand(b.index, i, 5) * 6.28))
