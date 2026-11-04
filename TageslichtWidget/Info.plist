@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>XPC!</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.9.46</string>
+	<string>0.9.47</string>
 	<key>CFBundleVersion</key>
-	<string>87</string>
+	<string>88</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>读取系统日历中的日程，在小组件上显示。</string>
 	<key>NSWidgetWantsLocation</key>

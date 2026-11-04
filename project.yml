@@ -23,13 +23,16 @@ targets:
       properties:
         CFBundleDisplayName: iCa
         CFBundleDevelopmentRegion: zh-Hans
-        CFBundleShortVersionString: "0.9.46"
-        CFBundleVersion: "87"
+        CFBundleShortVersionString: "0.9.47"
+        CFBundleVersion: "88"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSCalendarsFullAccessUsageDescription: 读取系统日历中的日程，在时间线上显示。
         NSCalendarsUsageDescription: 读取系统日历中的日程，在时间线上显示。
         NSLocationWhenInUseUsageDescription: 用当前位置获取天气、计算出发时间。
+        CFBundleURLTypes:
+          - CFBundleURLName: us.lied.tageslicht
+            CFBundleURLSchemes: [ica]
         GoogleMapsAPIKey: $(GOOGLE_MAPS_API_KEY)
         MeteoblueAPIKey: $(METEOBLUE_API_KEY)
     entitlements:
@@ -53,8 +56,8 @@ targets:
       properties:
         CFBundleDisplayName: iCa
         CFBundleDevelopmentRegion: zh-Hans
-        CFBundleShortVersionString: "0.9.46"
-        CFBundleVersion: "87"
+        CFBundleShortVersionString: "0.9.47"
+        CFBundleVersion: "88"
         NSCalendarsFullAccessUsageDescription: 读取系统日历中的日程，在小组件上显示。
         NSWidgetWantsLocation: true
         NSExtension:

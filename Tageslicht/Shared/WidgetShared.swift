@@ -70,3 +70,27 @@ struct WidgetSnapshot: Codable, Equatable {
         return (try? data.write(to: url, options: .atomic)) != nil
     }
 }
+
+/// The link the widget opens the app with: `ica://day/2026-11-05`, the day it shows.
+enum DayLink {
+    static let scheme = "ica"
+
+    private static func format() -> DateFormatter {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = .current
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }
+
+    static func url(for day: Date) -> URL? {
+        URL(string: "\(scheme)://day/\(format().string(from: day))")
+    }
+
+    /// Midnight of the day the link names.
+    static func day(from url: URL) -> Date? {
+        guard let text = url.pathComponents.last(where: { $0 != "/" }), let d = format().date(from: text) else { return nil }
+        return Calendar.current.startOfDay(for: d)
+    }
+}

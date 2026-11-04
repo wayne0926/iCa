@@ -295,6 +295,8 @@ struct TimelineWidgetView: View {
             }
         }
         .foregroundStyle(Ink.ink)
+        // A tap opens the app on the day shown, not on the month.
+        .widgetURL(DayLink.url(for: p.day))
     }
 
     private func monthDay(_ d: Date) -> String {

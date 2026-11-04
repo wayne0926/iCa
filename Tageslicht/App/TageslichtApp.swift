@@ -244,6 +244,43 @@ private struct CalendarRoot: View {
         }
         .tint(Theme.ink)
         .onChange(of: path.isEmpty) { _, atYear in showYear = atYear }
+        .onOpenURL { open($0) }
+    }
+
+    /// `ica://day/2026-11-05`, from the widget: straight to that day's page, with the month
+    /// it is in underneath, so closing the page lands in its month as if it had been opened
+    /// from there. Put in place at once, not animated through the months and years between.
+    private func open(_ url: URL) {
+        guard url.scheme == DayLink.scheme, url.host == "day", let day = DayLink.day(from: url) else { return }
+        let paging: Bool
+        if case .day? = path.last { paging = true } else { paging = false }
+        // Already on that day.
+        if paging, marks.day == day { return }
+        let month = Self.monthStart(day)
+        // Keep the month page that is there (it scrolls to the month behind the day page)
+        // rather than build another.
+        let base: Route
+        if case .month(let m)? = path.first {
+            base = .month(m)
+        } else {
+            base = .month(month)
+        }
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) {
+            shownMonth = month
+            marks.month = month
+            if case .month(let m) = base, m != month { marks.jump = month }
+            // A day page already open is taken away first: it may have paged off the day it
+            // was opened on, and the stack would keep it as it is for the same route.
+            path = paging ? [base] : [base, .day(day)]
+            marks.day = day
+        }
+        if paging {
+            DispatchQueue.main.async {
+                withTransaction(still) { path = [base, .day(day)] }
+            }
+        }
     }
 
     private static func monthStart(_ day: Date) -> Date {
