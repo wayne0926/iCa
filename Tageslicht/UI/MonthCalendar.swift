@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 /// Identifies one row of the month list: a month's title, or one of its weeks.
@@ -379,8 +380,128 @@ private struct WeekRow: View {
                     }
                 }
                 .frame(minHeight: detailed ? 96 : 62, alignment: .top)
+                // Days likely to be wet: a light shower over the whole cell.
+                .overlay {
+                    let wet = week.map { $0.flatMap { model.wet[$0] } }
+                    HStack(spacing: 0) {
+                        ForEach(0..<7, id: \.self) { i in
+                            ZStack {
+                                if i < wet.count, let w = wet[i], let day = week[i] {
+                                    CellRain(wet: w, seed: Calendar.current.ordinality(of: .day, in: .era, for: day) ?? i)
+                                        .transition(.opacity)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    }
+                    .allowsHitTesting(false)
+                    .animation(.easeInOut(duration: 0.6), value: wet)
+                }
         }
         .padding(.horizontal, Self.inset)
+    }
+}
+
+/// A light shower over a day the forecast says is likely wet: the day page's drops, few
+/// and faint, so the month shows which days to expect rain without a word or a colour.
+/// Each drop appears somewhere in the cell, falls a short way and fades, then comes back
+/// elsewhere; placed by a hash of its index and moved by the clock, so there is nothing
+/// to keep between frames. Stands still under Reduce Motion and in Low Power Mode.
+private struct CellRain: View {
+    let wet: WetDay
+    let seed: Int
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+
+    private static let fades = 3
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion || lowPower)) { timeline in
+            Canvas { ctx, size in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                if wet.snow { snow(&ctx, size, t) } else { rain(&ctx, size, t) }
+            }
+        }
+        .accessibilityHidden(true)
+        .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange)
+            .receive(on: RunLoop.main)) { _ in
+            lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+        }
+    }
+
+    /// Drops per 1000 pt², by the heaviest hour.
+    private var density: Double {
+        switch wet.intensity {
+        case ..<0.5: return 0.7
+        case ..<2: return 1.0
+        default: return 1.4
+        }
+    }
+
+    private func rain(_ ctx: inout GraphicsContext, _ size: CGSize, _ t: Double) {
+        // About 60 % of drops are showing at any moment; budget for that.
+        let count = min(40, Int(Double(size.width * size.height) / 1000 * density / 0.6))
+        let slant: CGFloat = 0.12
+        var paths = Array(repeating: Path(), count: Self.fades)
+        for i in 0..<count {
+            let near = rand(i, 6)
+            let life = 0.6 + 0.6 * rand(i, 1)
+            let period = life * (1.4 + 0.8 * rand(i, 9))
+            let clock = t + rand(i, 3) * period
+            let cycle = floor(clock / period)
+            let local = clock - cycle * period
+            guard local < life else { continue }
+            let c = Int(cycle.truncatingRemainder(dividingBy: 9973))
+            let fall = CGFloat((60 + 50 * near) * local)
+            let y = CGFloat(again(i, c, 5)) * size.height + fall
+            let x = CGFloat(again(i, c, 4)) * size.width - fall * slant
+            let length = CGFloat(4 + 4 * near)
+            let edge = min(1, max(0, min(y, size.height - y - length) / 10))
+            let alpha = CGFloat(sin(Double.pi * local / life)) * edge
+            guard alpha > 0.08 else { continue }
+            let level = min(Self.fades - 1, Int(alpha * CGFloat(Self.fades)))
+            paths[level].move(to: CGPoint(x: x, y: y))
+            paths[level].addLine(to: CGPoint(x: x - length * slant, y: y + length))
+        }
+        // Short and round-ended: drops, not streaks.
+        let style = StrokeStyle(lineWidth: 2.4, lineCap: .round)
+        for level in 0..<Self.fades where !paths[level].isEmpty {
+            ctx.stroke(paths[level], with: .color(Theme.ink.opacity(0.22 * Double(level + 1) / Double(Self.fades))),
+                       style: style)
+        }
+    }
+
+    private func snow(_ ctx: inout GraphicsContext, _ size: CGSize, _ t: Double) {
+        let count = min(24, Int(Double(size.width * size.height) / 1000 * 0.9))
+        var paths = Array(repeating: Path(), count: Self.fades)
+        for i in 0..<count {
+            let near = rand(i, 6)
+            let r = CGFloat(1.2 + 1.2 * near)
+            let travel = Double(size.height + r * 2)
+            let speed = (10 + 14 * near) * (0.8 + 0.4 * rand(i, 1))
+            let y = -r + CGFloat((rand(i, 3) * travel + t * speed).truncatingRemainder(dividingBy: travel))
+            let drift = CGFloat(3 + 3 * near) * CGFloat(sin(t * 1.1 + rand(i, 5) * 6.28))
+            let x = CGFloat(rand(i, 4)) * size.width + drift
+            let alpha = min(1, max(0, min(y + r, size.height - y) / 10))
+            guard alpha > 0.08 else { continue }
+            let level = min(Self.fades - 1, Int(alpha * CGFloat(Self.fades)))
+            paths[level].addEllipse(in: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2))
+        }
+        for level in 0..<Self.fades where !paths[level].isEmpty {
+            ctx.fill(paths[level], with: .color(Theme.ink.opacity(0.3 * Double(level + 1) / Double(Self.fades))))
+        }
+    }
+
+    /// Like `rand`, but different on each appearance of the drop.
+    private func again(_ i: Int, _ cycle: Int, _ channel: Int) -> Double {
+        rand(i * 7 + cycle * 7919, channel + 31)
+    }
+
+    /// Stable pseudo-random in [0, 1) per drop and channel; each day falls differently.
+    private func rand(_ i: Int, _ channel: Int) -> Double {
+        let v = sin(Double(seed % 10_007 * 7919 + i * 104_729 + channel * 1_299_709) * 12.9898) * 43758.5453
+        return v - floor(v)
     }
 }
 

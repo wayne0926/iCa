@@ -61,12 +61,36 @@ final class MonthModel {
     let leading: Int
     var items: [Date: [MonthItem]] = [:]
     var spans: [MonthSpan] = []
+    /// Days likely to be wet, for the rain in their cells.
+    var wet: [Date: WetDay] = [:]
 
     init(month: Date, calendar: Calendar) {
         self.month = month
         let count = calendar.range(of: .day, in: .month, for: month)?.count ?? 30
         days = (0..<count).compactMap { calendar.date(byAdding: .day, value: $0, to: month) }
         leading = (calendar.component(.weekday, from: month) - calendar.firstWeekday + 7) % 7
+    }
+}
+
+/// A day the forecast gives a good chance of rain or snow.
+struct WetDay: Hashable {
+    let snow: Bool
+    /// Heaviest hour, mm/h.
+    let intensity: Double
+
+    /// Likely enough to say so: the chance of rain in some waking hour, and enough of it
+    /// over the day to be more than a few drops.
+    static let chance = 60
+    static let millimetres = 1.0
+
+    init?(hours: [HourWeather]) {
+        let waking = hours.filter { (7..<23).contains(Calendar.current.component(.hour, from: $0.time)) }
+        guard let likely = waking.map(\.precipitationProbability).max(), likely >= Self.chance,
+              hours.reduce(0, { $0 + $1.precipitation }) >= Self.millimetres else { return nil }
+        let wet = hours.filter { $0.precipitation >= PrecipSpan.threshold }
+        let snowy = wet.filter { WeatherKind(pictocode: $0.pictocode) == .snow }.count
+        snow = snowy * 2 > wet.count
+        intensity = wet.map(\.precipitation).max() ?? 0
     }
 }
 
@@ -272,6 +296,8 @@ final class AppStore {
         let ordered = spans.values.sorted { ($0.first, $1.last, $0.title) < ($1.first, $0.last, $1.title) }
         if items != m.items { m.items = items }
         if ordered != m.spans { m.spans = ordered }
+        // Its events decide where each day's weather comes from.
+        fillWet(m)
     }
 
     private func fill(_ m: DayModel, with list: [CalEvent]) {
@@ -280,8 +306,11 @@ final class AppStore {
         if allDay != m.allDay { m.allDay = allDay }
         if placed != m.placed {
             m.placed = placed
-            // Its events decide where the day's weather comes from.
+            // Its events decide where the day's weather comes from, and the days beside it.
             fillWeather(m)
+            for step in [-1, 1] {
+                if let d = calendar.date(byAdding: .day, value: step, to: m.day), let n = models[d] { fillWeather(n) }
+            }
         }
     }
 
@@ -351,7 +380,7 @@ final class AppStore {
     // MARK: - Weather
 
     private func refreshWeather(force: Bool) async {
-        let areas = Set(models.values.map(area(of:))).union([here.area])
+        let areas = Set(models.values.map { area(on: $0.day) }).union([here.area])
         for a in areas { await fetchForecast(a, force: force) }
     }
 
@@ -370,27 +399,51 @@ final class AppStore {
         #endif
         fetchedAt[a] = Date()
         forecasts[a] = hours
-        for m in models.values where area(of: m) == a {
+        for m in models.values where area(on: m.day) == a {
             fillWeather(m)
             replan(m)
         }
+        for m in months.values { fillWet(m) }
     }
 
     /// Where a day's weather comes from: the first of its events that can be placed on the
-    /// map, else where the phone is. Unplaced addresses are looked up in the background.
-    private func area(of m: DayModel) -> Coordinate {
-        for e in m.placed.map(\.event).sorted(by: { $0.start < $1.start }) {
-            if let c = e.coordinate { return c.area }
+    /// map; without one, the last such event the day before (where the morning starts),
+    /// then the first the day after; else where the phone is. Two days away no longer
+    /// counts. Unplaced addresses are looked up in the background, the phone's area
+    /// standing in meanwhile.
+    private func area(on day: Date) -> Coordinate {
+        let timed = { (d: Date?) -> [CalEvent] in d.flatMap { self.events[$0] }?.filter { !$0.isAllDay } ?? [] }
+        let candidates = [
+            timed(day).sorted { $0.start < $1.start },
+            timed(calendar.date(byAdding: .day, value: -1, to: day)).sorted { $0.start > $1.start },
+            timed(calendar.date(byAdding: .day, value: 1, to: day)).sorted { $0.start < $1.start },
+        ]
+        for list in candidates {
+            switch place(of: list) {
+            case .at(let c): return c
+            case .pending: return here.area
+            case .nowhere: continue
+            }
+        }
+        return here.area
+    }
+
+    private enum Place { case at(Coordinate), pending, nowhere }
+
+    /// The area of the first of these events that has a place.
+    private func place(of list: [CalEvent]) -> Place {
+        for e in list {
+            if let c = e.coordinate { return .at(c.area) }
             guard let address = e.location?.trimmingCharacters(in: .whitespacesAndNewlines), !address.isEmpty,
                   !unplaceable.contains(address) else { continue }
             if let c = places[address] ?? geocoder.cachedNow(address) {
                 places[address] = c
-                return c.area
+                return .at(c.area)
             }
             geocode(address)
-            break
+            return .pending
         }
-        return here.area
+        return .nowhere
     }
 
     private func geocode(_ address: String) {
@@ -407,9 +460,9 @@ final class AppStore {
                 } else {
                     unplaceable.insert(next)
                 }
-                for m in models.values where m.placed.contains(where: { $0.event.location?.trimmingCharacters(in: .whitespacesAndNewlines) == next }) {
-                    fillWeather(m)
-                }
+                // It may decide the weather of its own day or of the days beside it.
+                for m in models.values { fillWeather(m) }
+                for m in months.values { fillWet(m) }
             }
             geocoding = false
         }
@@ -417,7 +470,7 @@ final class AppStore {
 
     private func fillWeather(_ m: DayModel) {
         guard let end = calendar.date(byAdding: .day, value: 1, to: m.day) else { return }
-        let a = area(of: m)
+        let a = area(on: m.day)
         guard let forecast = forecasts[a] else {
             // Not fetched yet: the phone's area stands in until it arrives.
             if started { Task { await fetchForecast(a, force: false) } }
@@ -425,6 +478,22 @@ final class AppStore {
             return
         }
         apply(forecast, to: m, until: end)
+    }
+
+    /// The month's likely wet days, each from its own place's forecast. Days not yet
+    /// forecast (past, or beyond 16 days) stay dry.
+    private func fillWet(_ m: MonthModel) {
+        let today = calendar.startOfDay(for: Date())
+        var wet: [Date: WetDay] = [:]
+        for d in m.days where d >= today {
+            guard let end = calendar.date(byAdding: .day, value: 1, to: d) else { continue }
+            let a = area(on: d)
+            guard let forecast = forecasts[a] ?? forecasts[here.area] else { continue }
+            if forecasts[a] == nil, started { Task { await fetchForecast(a, force: false) } }
+            guard let last = forecast.last?.time, last >= d else { continue }
+            if let w = WetDay(hours: forecast.filter { $0.time >= d && $0.time < end }) { wet[d] = w }
+        }
+        if wet != m.wet { m.wet = wet }
     }
 
     private func apply(_ forecast: [HourWeather], to m: DayModel, until end: Date) {
