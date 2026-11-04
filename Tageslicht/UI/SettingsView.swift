@@ -28,7 +28,7 @@ struct SettingsView: View {
                 } header: {
                     Text("日视图")
                 } footer: {
-                    Text("左右翻页时，整点横线、时刻和日出日落留在原处，只有日程跟着翻过去。")
+                    Text("左右翻页时，整点横线、时刻和日出日落留在原处，只有日程跟着翻过去。为了让每天的刻度对得上，开启后每天都显示全天，不再折叠空闲时段。")
                 }
                 Section {
                     DisclosureGroup(isExpanded: $calendarsOpen) {

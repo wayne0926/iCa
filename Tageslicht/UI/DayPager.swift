@@ -66,6 +66,7 @@ struct DayPager: View {
             pager
         }
         .background(Theme.paper)
+        .coordinateSpace(.named(DayPage.rootSpace))
         .onAppear {
             openedAt = Date()
             closing = false
@@ -151,7 +152,7 @@ struct DayPager: View {
 
     private func show(_ day: Date) {
         guard day != shown else { return }
-        withAnimation(.snappy(duration: 0.3)) {
+        withAnimation(DayPage.stripAnimation) {
             backwards = day < shown
             shown = day
         }
@@ -192,6 +193,7 @@ private struct DayHeader: View {
 
     @AppStorage("timelineZoom") private var zoom = TimelineZoom.standard.rawValue
     @AppStorage("timelineFullDay") private var fullDay = false
+    @AppStorage(DayTimeline.pinGridKey) private var pinGrid = false
 
     /// The widest date there is: it holds the room, so neither the weekday after it nor the
     /// button around it moves as the digits change.
@@ -254,10 +256,15 @@ private struct DayHeader: View {
                     HeaderButton(symbol: "arrow.up.and.down",
                                  label: grows ? "放大时间线" : "缩小时间线",
                                  action: { zoom = step.next.rawValue })
-                    Rectangle().fill(Theme.hairline).frame(width: 1, height: 18)
-                    // Filled clock = the whole 24 hours are showing.
-                    HeaderButton(symbol: fullDay ? "clock.fill" : "clock",
-                                 label: fullDay ? "折叠空闲时段" : "显示全天", action: { fullDay.toggle() })
+                    // A grid held still while paging is one grid for every day, so no day
+                    // can fold its own empty hours: the whole day always shows, and there
+                    // is nothing to switch.
+                    if !pinGrid {
+                        Rectangle().fill(Theme.hairline).frame(width: 1, height: 18)
+                        // Filled clock = the whole 24 hours are showing.
+                        HeaderButton(symbol: fullDay ? "clock.fill" : "clock",
+                                     label: fullDay ? "折叠空闲时段" : "显示全天", action: { fullDay.toggle() })
+                    }
                 }
                 .background(Theme.ink.opacity(0.07), in: Capsule())
             }

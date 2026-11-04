@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// An hour of the day and where on screen it sits (window coordinates, so pages whose
-/// headers differ in height still line up).
+/// An hour of the day and where on screen it sits (in the day pages' frame, so pages
+/// whose tops differ still line up).
 struct TimeAnchor: Equatable {
     let hour: Double
     let screenY: CGFloat
@@ -26,8 +26,18 @@ struct DayPage: View {
     /// The offset the driver last set; the scroll view reports it a frame late.
     @State private var drivenY: CGFloat?
     @AppStorage("timelineZoom") private var zoom = TimelineZoom.standard.rawValue
-    @AppStorage("timelineFullDay") private var fullDay = false
+    @AppStorage("timelineFullDay") private var fullDayChosen = false
     @AppStorage(DayTimeline.pinGridKey) private var pinGrid = false
+
+    /// A grid held still while paging is one grid for every page: every day on the same
+    /// scale, so none folds its own empty hours.
+    private var fullDay: Bool { fullDayChosen || pinGrid }
+
+    /// The day pages' own frame of reference, so the zoom that opens and closes them never
+    /// reads as the pages moving.
+    static let rootSpace = "dayRoot"
+    /// The curve the header's all-day strip comes and goes on.
+    static let stripAnimation = Animation.snappy(duration: 0.3)
 
     private var hourHeight: CGFloat { (TimelineZoom(rawValue: zoom) ?? .standard).hourHeight }
 
@@ -51,7 +61,17 @@ struct DayPage: View {
         // when it lifts, when the scroll comes to rest. A finger landing to swipe sideways
         // is one of those, so they are lined up before they come into view.
         .onScrollPhaseChange { _, _ in publishAnchor() }
-        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { geo.top = $0 }
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(DayPage.rootSpace)).minY } action: { old, new in
+            geo.top = new
+            // The all-day strip above came or went with the new day, moving the pager's top.
+            // The hours stay where they were on screen: the offset moves with the top, on
+            // the strip's own curve, so the grid and the day never shift under the reader.
+            let shift = new - old
+            guard didAppear, blend == nil, abs(shift) > 0.5 else { return }
+            withAnimation(DayPage.stripAnimation) {
+                position.scrollTo(y: max(0, geo.offset + shift))
+            }
+        }
         .background(Theme.paper)
         .onAppear {
             // After the first layout pass, or the scroll view has nothing to scroll yet.
@@ -99,7 +119,7 @@ struct DayPage: View {
     private final class PageGeometry {
         var offset: CGFloat = 0
         var height: CGFloat = 0
-        /// Window y of the timeline's visible top edge.
+        /// Y of the timeline's visible top edge, in the day pages' frame.
         var top: CGFloat = 0
     }
 
