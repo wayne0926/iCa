@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The A layout on a folding time scale: busy stretches at full scale, long empty
 /// stretches folded into a short strip. Rain falls across the hours it's forecast;
-/// sunrise/sunset rules cross the grid.
+/// sunrise and sunset sit as small balls at the right edge.
 struct DayTimeline: View {
     let model: DayModel
     let isToday: Bool
@@ -58,16 +58,6 @@ struct DayTimeline: View {
 
     private func dayLayer(scale: ScaleBlend, wet: [PrecipSpan], now: Date) -> some View {
         TimelineLayout(scale: scale, extraBottom: extraBottom) {
-            ForEach(sunMarks, id: \.symbol) { mark in
-                Rectangle()
-                    .fill(Theme.sunRule)
-                    .layoutValue(key: Slot.self, value: .sunRule(mark.hour))
-                Text("\(Image(systemName: mark.symbol)) \(mark.date.formatted(Fmt.time))")
-                    .font(Theme.mark)
-                    .foregroundStyle(Theme.sun)
-                    .fixedSize()
-                    .layoutValue(key: Slot.self, value: .sunTag(mark.hour))
-            }
             ForEach(Array(wet.enumerated()), id: \.offset) { i, span in
                 RainLayer(span: span, index: i, active: isActive, plane: .behind)
                     .layoutValue(key: Slot.self, value: .band(span.start, span.end))
@@ -86,18 +76,24 @@ struct DayTimeline: View {
                 RainLayer(span: span, index: i, active: isActive, plane: .inFront)
                     .layoutValue(key: Slot.self, value: .band(span.start, span.end))
             }
+            // Last, so a ball is never under a card it has stepped aside from, and its tap
+            // never reaches the card.
+            ForEach(sunMarks, id: \.rising) { mark in
+                SunBall(date: mark.date, rising: mark.rising)
+                    .layoutValue(key: Slot.self, value: .sun(mark.hour))
+            }
         }
     }
 
     private struct SunMark {
         let date: Date
         let hour: Double
-        let symbol: String
+        let rising: Bool
     }
 
     private var sunMarks: [SunMark] {
-        [(model.sun.sunrise, "sunrise"), (model.sun.sunset, "sunset")].compactMap { date, symbol in
-            date.map { SunMark(date: $0, hour: $0.timeIntervalSince(model.day) / 3600, symbol: symbol) }
+        [(model.sun.sunrise, true), (model.sun.sunset, false)].compactMap { date, rising in
+            date.map { SunMark(date: $0, hour: $0.timeIntervalSince(model.day) / 3600, rising: rising) }
         }
     }
 
@@ -144,7 +140,7 @@ private struct PinnedToScreen: ViewModifier {
 struct Slot: LayoutValueKey {
     enum Kind: Equatable {
         case card(column: Int, columns: Int)
-        case rule, label, sunRule, sunTag, band
+        case rule, label, sun, band
     }
 
     static let defaultValue = Slot(kind: .rule, start: 0, end: 0)
@@ -157,8 +153,7 @@ struct Slot: LayoutValueKey {
     }
     static func rule(_ h: Double) -> Slot { Slot(kind: .rule, start: h, end: h) }
     static func label(_ h: Double) -> Slot { Slot(kind: .label, start: h, end: h) }
-    static func sunRule(_ h: Double) -> Slot { Slot(kind: .sunRule, start: h, end: h) }
-    static func sunTag(_ h: Double) -> Slot { Slot(kind: .sunTag, start: h, end: h) }
+    static func sun(_ h: Double) -> Slot { Slot(kind: .sun, start: h, end: h) }
     static func band(_ start: Double, _ end: Double) -> Slot { Slot(kind: .band, start: start, end: end) }
 }
 
@@ -177,31 +172,37 @@ struct TimelineLayout: Layout {
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         func y(_ h: Double) -> CGFloat { bounds.minY + Theme.topInset + scale.y(h) }
+        func cardSpan(_ s: Slot) -> (top: CGFloat, bottom: CGFloat) {
+            let top = y(s.start) + Self.cardGap / 2
+            return (top, top + max(y(s.end) - Self.cardGap / 2 - top, Self.cardMinHeight))
+        }
         let area = bounds.width - Theme.eventsLeading - Theme.trailing
+        // Where cards reach the right edge, for the sun balls to keep clear of. A handful of
+        // cards, once per layout pass.
+        let taken = Self.takenAtRightEdge(subviews.map { $0[Slot.self] }, span: cardSpan)
         for v in subviews {
             let s = v[Slot.self]
             switch s.kind {
             case .card(let column, let columns):
                 let colWidth = area / CGFloat(max(columns, 1))
                 let x = bounds.minX + Theme.eventsLeading + colWidth * CGFloat(column)
-                let top = y(s.start) + Self.cardGap / 2
-                let h = max(y(s.end) - Self.cardGap / 2 - top, Self.cardMinHeight)
-                v.place(at: CGPoint(x: x, y: top), anchor: .topLeading,
-                        proposal: ProposedViewSize(width: colWidth - (column < columns - 1 ? 4 : 0), height: h))
+                let span = cardSpan(s)
+                v.place(at: CGPoint(x: x, y: span.top), anchor: .topLeading,
+                        proposal: ProposedViewSize(width: colWidth - (column < columns - 1 ? 4 : 0), height: span.bottom - span.top))
             case .rule:
                 let x = bounds.minX + Theme.eventsLeading - 4
-                v.place(at: CGPoint(x: x, y: y(s.start) - 0.5), anchor: .topLeading,
-                        proposal: ProposedViewSize(width: bounds.maxX - x, height: 1))
-            case .sunRule:
-                let x = bounds.minX + Theme.gutter
                 v.place(at: CGPoint(x: x, y: y(s.start) - 0.5), anchor: .topLeading,
                         proposal: ProposedViewSize(width: bounds.maxX - x, height: 1))
             case .label:
                 v.place(at: CGPoint(x: bounds.minX + Theme.gutter - 6, y: y(s.start)), anchor: .trailing,
                         proposal: .unspecified)
-            case .sunTag:
-                v.place(at: CGPoint(x: bounds.maxX - Theme.trailing, y: y(s.start) - 2), anchor: .bottomTrailing,
-                        proposal: .unspecified)
+            case .sun:
+                let clear = SunBall.size / 2 + 4
+                let cy = Self.free(near: y(s.start), taken: taken, clear: clear,
+                                   floor: bounds.minY + clear)
+                // The view carries its own invisible tap margin on every side.
+                v.place(at: CGPoint(x: bounds.maxX - SunBall.edge + SunBall.hitMargin, y: cy),
+                        anchor: .trailing, proposal: .unspecified)
             case .band:
                 let m = RainLayer.margin
                 let top = y(s.start) - m
@@ -209,6 +210,127 @@ struct TimelineLayout: Layout {
                         proposal: ProposedViewSize(width: bounds.width, height: y(s.end) + m - top))
             }
         }
+    }
+
+    /// The vertical stretches covered by cards in the last column, the ones that reach the
+    /// right edge, sorted and merged.
+    private static func takenAtRightEdge(_ slots: [Slot],
+                                         span: (Slot) -> (top: CGFloat, bottom: CGFloat)) -> [ClosedRange<CGFloat>] {
+        let spans = slots.compactMap { s -> ClosedRange<CGFloat>? in
+            guard case .card(let column, let columns) = s.kind, column == columns - 1 else { return nil }
+            let r = span(s)
+            return r.top...r.bottom
+        }
+        .sorted { $0.lowerBound < $1.lowerBound }
+        var merged: [ClosedRange<CGFloat>] = []
+        for r in spans {
+            if let last = merged.last, r.lowerBound <= last.upperBound {
+                merged[merged.count - 1] = last.lowerBound...max(last.upperBound, r.upperBound)
+            } else {
+                merged.append(r)
+            }
+        }
+        return merged
+    }
+
+    /// The centre nearest `y` that keeps `clear` away from every taken stretch: the ball
+    /// stays at its hour when it can, else steps just above or below the cards in its way,
+    /// whichever is the shorter move.
+    private static func free(near y: CGFloat, taken: [ClosedRange<CGFloat>], clear: CGFloat,
+                             floor: CGFloat) -> CGFloat {
+        // Grown by the clearance and merged again: two cards closer than a ball are one block.
+        var blocks: [ClosedRange<CGFloat>] = []
+        for r in taken {
+            let g = (r.lowerBound - clear)...(r.upperBound + clear)
+            if let last = blocks.last, g.lowerBound <= last.upperBound {
+                blocks[blocks.count - 1] = last.lowerBound...max(last.upperBound, g.upperBound)
+            } else {
+                blocks.append(g)
+            }
+        }
+        guard let block = blocks.first(where: { $0.contains(y) }) else { return y }
+        let above = block.lowerBound, below = block.upperBound
+        if above < floor { return below }
+        return y - above <= below - y ? above : below
+    }
+}
+
+// MARK: - Sun
+
+/// Sunrise or sunset: a small, quiet ball at the right edge, near its hour. A tap slides
+/// the time out to its left; it folds back by itself a few seconds later.
+private struct SunBall: View {
+    let date: Date
+    let rising: Bool
+    @State private var open = false
+
+    static let size: CGFloat = 24
+    /// Distance from the timeline's right edge to the ball's.
+    static let edge: CGFloat = 6
+    /// Invisible margin around the ball that still takes the tap.
+    static let hitMargin: CGFloat = 8
+    private static let glyph: CGFloat = 14
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if open {
+                Text(date.formatted(Fmt.time))
+                    .font(Theme.mark)
+                    .foregroundStyle(Theme.sun)
+                    .fixedSize()
+                    .transition(.opacity.combined(with: .offset(x: 8)))
+            }
+            SunGlyph(rising: rising)
+                .stroke(Theme.sun, style: StrokeStyle(lineWidth: 1.9, lineCap: .round, lineJoin: .round))
+                .frame(width: Self.glyph, height: Self.glyph)
+        }
+        // Closed it is exactly a circle; open, it grows to the left only, so the glyph
+        // never moves under the finger.
+        .padding(.leading, open ? 10 : (Self.size - Self.glyph) / 2)
+        .padding(.trailing, (Self.size - Self.glyph) / 2)
+        .frame(height: Self.size)
+        .background(Capsule().fill(Theme.sunBall))
+        .padding(Self.hitMargin)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.snappy(duration: 0.3)) { open.toggle() }
+        }
+        .task(id: open) {
+            guard open else { return }
+            try? await Task.sleep(for: .seconds(4))
+            withAnimation(.snappy(duration: 0.3)) { open = false }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(rising ? "日出" : "日落") \(date.formatted(Fmt.time))")
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// A half sun on the horizon with a chevron above it: up for sunrise, down for sunset.
+/// Drawn as strokes so the line weight matches the rest of the page.
+private struct SunGlyph: Shape {
+    let rising: Bool
+
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        let w = r.width, h = r.height
+        let base = r.minY + h * 0.82
+        let radius = w * 0.3
+        // Horizon.
+        p.move(to: CGPoint(x: r.minX + w * 0.06, y: base))
+        p.addLine(to: CGPoint(x: r.maxX - w * 0.06, y: base))
+        // Upper half of the sun, left to right over the top.
+        p.move(to: CGPoint(x: r.midX - radius, y: base))
+        p.addRelativeArc(center: CGPoint(x: r.midX, y: base), radius: radius,
+                         startAngle: .degrees(180), delta: .degrees(180))
+        // Chevron.
+        let top = r.minY + h * 0.07, depth = h * 0.17, half = w * 0.19
+        let tip = rising ? top : top + depth
+        let wings = rising ? top + depth : top
+        p.move(to: CGPoint(x: r.midX - half, y: wings))
+        p.addLine(to: CGPoint(x: r.midX, y: tip))
+        p.addLine(to: CGPoint(x: r.midX + half, y: wings))
+        return p
     }
 }
 
