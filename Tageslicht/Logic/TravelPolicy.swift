@@ -16,7 +16,8 @@ enum TravelPolicy {
     static func plan(arrival: Date,
                      bike: RouteResult?,
                      transit: RouteResult?,
-                     weather: [HourWeather]) -> TravelPlan? {
+                     weather: [HourWeather],
+                     radar: [RadarStep] = []) -> TravelPlan? {
         func bikePlan(_ b: RouteResult) -> TravelPlan {
             TravelPlan(mode: .bicycle, duration: b.duration,
                        leaveAt: arrival.addingTimeInterval(-b.duration - buffer),
@@ -32,7 +33,7 @@ enum TravelPolicy {
         guard let t = transit, t.firstLeg != nil else { return bikePlan(b) }
 
         let rideStart = arrival.addingTimeInterval(-b.duration - buffer)
-        if isWet(from: rideStart, to: arrival, weather: weather) {
+        if isWet(from: rideStart, to: arrival, weather: weather, radar: radar) {
             return transitPlan(t, .rain)
         }
         if b.duration > longRide && t.duration <= b.duration * transitSlackFactor {
@@ -41,8 +42,17 @@ enum TravelPolicy {
         return bikePlan(b)
     }
 
-    static func isWet(from start: Date, to end: Date, weather: [HourWeather]) -> Bool {
-        weather.contains { h in
+    /// Where the radar reaches the ride, it decides: it sees the shower that is actually
+    /// coming. The forecast speaks for the rest of the ride.
+    static func isWet(from start: Date, to end: Date, weather: [HourWeather], radar: [RadarStep] = []) -> Bool {
+        var start = start
+        if let first = radar.first?.start, let last = radar.last?.time, first <= start, last > start {
+            let seen = radar.filter { $0.time > start && $0.start < end }
+            if seen.contains(where: { $0.rate >= rainMillimetres }) { return true }
+            guard last < end else { return false }
+            start = last
+        }
+        return weather.contains { h in
             let hEnd = h.time.addingTimeInterval(3600)
             guard hEnd > start, h.time < end else { return false }
             return h.precipitation >= rainMillimetres

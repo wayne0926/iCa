@@ -11,6 +11,8 @@ final class DayModel {
     var allDay: [CalEvent] = []
     var placed: [PlacedEvent] = []
     var hours: [HourWeather] = []
+    /// Today only: the DWD radar's five-minute rain, an hour back to two ahead.
+    var radar: [RadarStep] = []
     var summary: DaySummary?
     var sun: SunTimes
     var travel: [String: TravelPlan] = [:]
@@ -92,6 +94,14 @@ struct WetDay: Hashable {
         snow = snowy * 2 > wet.count
         intensity = wet.map(\.precipitation).max() ?? 0
     }
+
+    /// From the 46-day ensemble, past the hourly forecast: enough of its runs bring rain.
+    init?(outlook o: DayOutlook) {
+        guard o.chance >= Self.chance else { return nil }
+        snow = o.snow
+        // Spread over a few hours, as a day's rain usually is.
+        intensity = o.millimetres / 6
+    }
 }
 
 @MainActor
@@ -119,6 +129,9 @@ final class AppStore {
     @ObservationIgnored private var forecasts: [Coordinate: [HourWeather]] = [:]
     @ObservationIgnored private var fetchedAt: [Coordinate: Date] = [:]
     @ObservationIgnored private var fetching: Set<Coordinate> = []
+    /// ECMWF's 46-day outlook by area, for the month's days past the hourly forecast.
+    @ObservationIgnored private var outlooks: [Coordinate: [Date: DayOutlook]] = [:]
+    @ObservationIgnored private var radarLoop: Task<Void, Never>?
     @ObservationIgnored private let geocoder = Geocoder()
     /// Event addresses already placed on the map, and those Apple couldn't find.
     @ObservationIgnored private var places: [String: Coordinate] = [:]
@@ -171,6 +184,7 @@ final class AppStore {
 
         if let c = await location.current() { here = c }
         locationReady = true
+        startRadar()
         await refreshWeather(force: false)
         for m in models.values { await loadTravel(for: m) }
     }
@@ -178,6 +192,7 @@ final class AppStore {
     /// Called when the app comes back to the foreground.
     func refresh() async {
         guard started else { return }
+        await refreshRadar()
         await refreshWeather(force: false)
         if let today = models[calendar.startOfDay(for: Date())] { await loadTravel(for: today) }
     }
@@ -399,6 +414,9 @@ final class AppStore {
         #endif
         fetchedAt[a] = Date()
         forecasts[a] = hours
+        if let days = try? await weatherService.outlook(at: a) {
+            outlooks[a] = Dictionary(days.map { ($0.day, $0) }, uniquingKeysWith: { $1 })
+        }
         for m in models.values where area(on: m.day) == a {
             fillWeather(m)
             replan(m)
@@ -419,7 +437,7 @@ final class AppStore {
             timed(calendar.date(byAdding: .day, value: 1, to: day)).sorted { $0.start < $1.start },
         ]
         for list in candidates {
-            switch place(of: list) {
+            switch spot(of: list) {
             case .at(let c): return c
             case .pending: return here.area
             case .nowhere: continue
@@ -428,10 +446,10 @@ final class AppStore {
         return here.area
     }
 
-    private enum Place { case at(Coordinate), pending, nowhere }
+    private enum Spot { case at(Coordinate), pending, nowhere }
 
     /// The area of the first of these events that has a place.
-    private func place(of list: [CalEvent]) -> Place {
+    private func spot(of list: [CalEvent]) -> Spot {
         for e in list {
             if let c = e.coordinate { return .at(c.area) }
             guard let address = e.location?.trimmingCharacters(in: .whitespacesAndNewlines), !address.isEmpty,
@@ -488,12 +506,42 @@ final class AppStore {
         for d in m.days where d >= today {
             guard let end = calendar.date(byAdding: .day, value: 1, to: d) else { continue }
             let a = area(on: d)
-            guard let forecast = forecasts[a] ?? forecasts[here.area] else { continue }
             if forecasts[a] == nil, started { Task { await fetchForecast(a, force: false) } }
-            guard let last = forecast.last?.time, last >= d else { continue }
-            if let w = WetDay(hours: forecast.filter { $0.time >= d && $0.time < end }) { wet[d] = w }
+            // Hourly where there is a forecast for the whole day, the ensemble after that.
+            if let forecast = forecasts[a] ?? forecasts[here.area], let last = forecast.last?.time, last >= end.addingTimeInterval(-3600) {
+                if let w = WetDay(hours: forecast.filter { $0.time >= d && $0.time < end }) { wet[d] = w }
+            } else if let o = (outlooks[a] ?? outlooks[here.area])?[d], let w = WetDay(outlook: o) {
+                wet[d] = w
+            }
         }
         if wet != m.wet { m.wet = wet }
+    }
+
+    // MARK: - Radar
+
+    /// Every five minutes while the app is open, as often as the radar itself: today's
+    /// rain from the DWD radar where it reaches (Germany and around it).
+    private func startRadar() {
+        guard radarLoop == nil else { return }
+        radarLoop = Task {
+            while !Task.isCancelled {
+                await refreshRadar()
+                try? await Task.sleep(for: .seconds(5 * 60))
+            }
+        }
+    }
+
+    private func refreshRadar() async {
+        let today = calendar.startOfDay(for: Date())
+        // The radar is sharp to a kilometre: the phone's own position, not its area, when
+        // that is where the day is.
+        let a = area(on: today)
+        let steps = (try? await weatherService.radar(at: a == here.area ? here : a)) ?? []
+        let m = model(for: today)
+        // Nothing back, or out of range: the forecast speaks alone.
+        guard steps != m.radar else { return }
+        m.radar = steps
+        replan(m)
     }
 
     private func apply(_ forecast: [HourWeather], to m: DayModel, until end: Date) {
@@ -580,7 +628,8 @@ final class AppStore {
         var plans: [String: TravelPlan] = [:]
         for trip in tripsNeeded(m, now: Date()) {
             guard let r = routeCache[trip.key],
-                  let plan = TravelPolicy.plan(arrival: trip.arrival, bike: r.bike, transit: r.transit, weather: m.hours)
+                  let plan = TravelPolicy.plan(arrival: trip.arrival, bike: r.bike, transit: r.transit,
+                                               weather: m.hours, radar: m.radar)
             else { continue }
             plans[trip.eventID] = plan
         }

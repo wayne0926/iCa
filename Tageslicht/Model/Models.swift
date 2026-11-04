@@ -46,6 +46,30 @@ struct HourWeather: Hashable, Codable, Sendable {
     let windSpeed: Double              // m/s
 }
 
+/// Five minutes of rain from the DWD radar (measured, or extrapolated up to two hours
+/// ahead): what fell in the five minutes up to `time`.
+struct RadarStep: Hashable, Codable, Sendable {
+    let time: Date
+    /// mm in these five minutes.
+    let millimetres: Double
+
+    static let length: TimeInterval = 5 * 60
+    var start: Date { time.addingTimeInterval(-Self.length) }
+    /// As a rate, mm/h.
+    var rate: Double { millimetres * 12 }
+}
+
+/// One day of ECMWF's 46-day ensemble: how many of its runs bring rain.
+struct DayOutlook: Hashable, Codable, Sendable {
+    let day: Date
+    /// Share of the ensemble members with at least a millimetre that day, %.
+    let chance: Int
+    /// The members' mean, mm.
+    let millimetres: Double
+    /// Most members fall as snow.
+    let snow: Bool
+}
+
 struct SunTimes: Hashable, Sendable {
     let sunrise: Date?
     let sunset: Date?

@@ -160,4 +160,126 @@ struct WeatherService: Sendable {
                                windSpeed: h.windspeed[i])
         }
     }
+
+    // MARK: ECMWF EC46 (Open-Meteo seasonal)
+
+    /// Day by day for the next 46 days, from ECMWF's extended-range ensemble: only good for
+    /// "likely wet or not", which is all it is used for, on days past the hourly forecast.
+    func outlook(at c: Coordinate) async throws -> [DayOutlook] {
+        let key = "outlook|" + String(format: "%.2f,%.2f", c.lat, c.lon)
+        // EC46 runs once a day.
+        if let (days, _) = await DiskCache.shared.read([DayOutlook].self, key: key, maxAge: 6 * 3600) {
+            return days
+        }
+        var comps = URLComponents(string: "https://seasonal-api.open-meteo.com/v1/seasonal")!
+        comps.queryItems = [
+            .init(name: "latitude", value: String(c.lat)),
+            .init(name: "longitude", value: String(c.lon)),
+            .init(name: "models", value: "ecmwf_ec46"),
+            .init(name: "daily", value: "precipitation_sum,snowfall_sum"),
+            .init(name: "forecast_days", value: "46"),
+            .init(name: "timezone", value: TimeZone.current.identifier),
+        ]
+        let (data, response) = try await URLSession.shared.data(from: comps.url!)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw Failure.badResponse }
+        let days = try Self.parseOutlook(data)
+        guard !days.isEmpty else { throw Failure.badResponse }
+        await DiskCache.shared.write(days, key: key)
+        return days
+    }
+
+    /// The daily block holds `time`, then each variable once for the control run and once
+    /// per member (`precipitation_sum`, `precipitation_sum_member01` …). Every series of a
+    /// variable is a vote; a day nobody has a value for is left out.
+    static func parseOutlook(_ data: Data) throws -> [DayOutlook] {
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let daily = root["daily"] as? [String: Any],
+              let time = daily["time"] as? [String] else { throw Failure.badResponse }
+        func series(_ name: String) -> [[Double?]] {
+            daily.compactMap { entry -> [Double?]? in
+                guard entry.key == name || entry.key.hasPrefix(name + "_member"),
+                      let list = entry.value as? [Any] else { return nil }
+                return list.map { ($0 as? NSNumber)?.doubleValue }
+            }
+        }
+        let rain = series("precipitation_sum"), snow = series("snowfall_sum")
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = .current
+        f.dateFormat = "yyyy-MM-dd"
+        return time.indices.compactMap { i in
+            guard let day = f.date(from: time[i]) else { return nil }
+            let amounts = rain.compactMap { i < $0.count ? $0[i] : nil }
+            guard !amounts.isEmpty else { return nil }
+            let snowy = snow.compactMap { i < $0.count ? $0[i] : nil }
+            return DayOutlook(day: Calendar.current.startOfDay(for: day),
+                              chance: Int((Double(amounts.filter { $0 >= WetDay.millimetres }.count) / Double(amounts.count) * 100).rounded()),
+                              millimetres: amounts.reduce(0, +) / Double(amounts.count),
+                              // snowfall_sum is in cm.
+                              snow: !snowy.isEmpty && snowy.filter { $0 >= 0.5 }.count * 2 > snowy.count)
+        }
+    }
+
+    // MARK: DWD radar (Bright Sky)
+
+    /// Whether the DWD radar composite reaches this far: a box safely inside its grid,
+    /// whose edges always read zero.
+    static func radarCovers(_ c: Coordinate) -> Bool {
+        (46.5...55.0).contains(c.lat) && (4.5...15.5).contains(c.lon)
+    }
+
+    /// Rain at this point, in five-minute steps, from an hour back to two hours ahead.
+    /// The point is the mean of the 3 × 3 km around it, so one noisy pixel doesn't decide.
+    func radar(at c: Coordinate) async throws -> [RadarStep] {
+        guard Self.radarCovers(c) else { return [] }
+        var comps = URLComponents(string: "https://api.brightsky.dev/radar")!
+        comps.queryItems = [
+            .init(name: "lat", value: String(c.lat)),
+            .init(name: "lon", value: String(c.lon)),
+            .init(name: "distance", value: "3000"),
+            .init(name: "format", value: "plain"),
+        ]
+        let (data, response) = try await URLSession.shared.data(from: comps.url!)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw Failure.badResponse }
+        return try Self.parseRadar(data)
+    }
+
+    private struct RadarPayload: Decodable {
+        struct Record: Decodable {
+            let timestamp: String
+            /// 0.01 mm per pixel per five minutes; rows north to south, columns west to east.
+            let precipitation_5: [[Int?]]
+        }
+        struct Position: Decodable { let x: Double; let y: Double }
+        let radar: [Record]
+        /// top, left, bottom, right, in grid pixels.
+        let bbox: [Int]?
+        let latlon_position: Position?
+    }
+
+    static func parseRadar(_ data: Data) throws -> [RadarStep] {
+        let p = try JSONDecoder().decode(RadarPayload.self, from: data)
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime]
+        return p.radar.compactMap { r in
+            guard let time = iso.date(from: r.timestamp), !r.precipitation_5.isEmpty else { return nil }
+            let rows = r.precipitation_5.count, cols = r.precipitation_5[0].count
+            // The point within the cut-out; given either within it or on the whole grid.
+            var x = p.latlon_position.map { Int($0.x.rounded(.down)) } ?? cols / 2
+            var y = p.latlon_position.map { Int($0.y.rounded(.down)) } ?? rows / 2
+            if let b = p.bbox, b.count == 4, x >= cols || y >= rows { x -= b[1]; y -= b[0] }
+            guard (0..<cols).contains(x), (0..<rows).contains(y) else { return nil }
+            var sum = 0, n = 0
+            for row in max(0, y - 1)...min(rows - 1, y + 1) {
+                let line = r.precipitation_5[row]
+                guard line.count > x else { continue }
+                for col in max(0, x - 1)...min(line.count - 1, x + 1) {
+                    if let v = line[col] { sum += v; n += 1 }
+                }
+            }
+            guard n > 0 else { return nil }
+            return RadarStep(time: time, millimetres: Double(sum) / Double(n) / 100)
+        }
+        .sorted { $0.time < $1.time }
+    }
 }

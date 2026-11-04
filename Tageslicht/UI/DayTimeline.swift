@@ -29,7 +29,7 @@ struct DayTimeline: View {
     var body: some View {
         let target = Self.scale(for: model, isToday: isToday, hourHeight: hourHeight, fullDay: fullDay)
         let scale = blend ?? ScaleBlend(target)
-        let wet = PrecipSpan.spans(from: model.hours, day: model.day)
+        let wet = PrecipSpan.spans(from: model.hours, day: model.day, radar: model.radar)
         let now = Date()
         let hours = Int(Self.dayHours(model.day).rounded())
         // Everything is a positioned view: an animation frame only moves layers, it never
