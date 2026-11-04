@@ -18,12 +18,13 @@ struct DayTimeline: View {
     /// Extra room below the day while a change animates, so the scroll offset is never
     /// clamped by a content height that is still catching up.
     let extraBottom: CGFloat
-    /// The hour lines and labels hold still on screen while the day pages under them.
+    /// The hour lines and labels hold still on screen while the day pages under them,
+    /// and slide to each new day's hours as it comes.
     var pinGrid = false
     /// Settings: whether the grid holds still while paging.
     static let pinGridKey = "timelinePinGrid"
-    /// Where a held-still sun ball is drawn; nil outside the pager.
-    @Environment(SunTrack.self) private var sunTrack: SunTrack?
+    /// Where the held-still grid and sun balls are drawn; nil outside the pager.
+    @Environment(PinTrack.self) private var pinTrack: PinTrack?
 
     var body: some View {
         let target = Self.scale(for: model, isToday: isToday, hourHeight: hourHeight, fullDay: fullDay)
@@ -34,23 +35,32 @@ struct DayTimeline: View {
         // Everything is a positioned view: an animation frame only moves layers, it never
         // repaints the day. The order below is the drawing order: the hour grid, then the day.
         ZStack(alignment: .topLeading) {
-            TimelineLayout(scale: scale, extraBottom: extraBottom) {
-                ForEach(0...hours, id: \.self) { i in
-                    Rectangle()
-                        .fill(Theme.hairline)
-                        .opacity(scale.gridWeight(Double(i)))
-                        .layoutValue(key: Slot.self, value: .rule(Double(i)))
-                }
-                ForEach(0..<hours, id: \.self) { i in
-                    Text(Fmt.hour(model.day.addingTimeInterval(Double(i) * 3600)))
-                        .font(Theme.hourLabel)
-                        .foregroundStyle(Theme.hourInk)
-                        .fixedSize()
-                        .opacity(scale.gridWeight(Double(i), label: true))
-                        .layoutValue(key: Slot.self, value: .label(Double(i)))
+            // Held still, the grid is the pager's, one for every page (`PinnedGrid`): the
+            // page only says where its hours are.
+            if let pinTrack, pinGrid {
+                Color.clear
+                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(PinTrack.space)).minY } action: { y in
+                        pinTrack.origins[model.day] = y
+                    }
+                    .onChange(of: scale, initial: true) { _, s in pinTrack.scales[model.day] = s }
+            } else {
+                TimelineLayout(scale: scale, extraBottom: extraBottom) {
+                    ForEach(0...hours, id: \.self) { i in
+                        Rectangle()
+                            .fill(Theme.hairline)
+                            .opacity(scale.gridWeight(Double(i)))
+                            .layoutValue(key: Slot.self, value: .rule(Double(i)))
+                    }
+                    ForEach(0..<hours, id: \.self) { i in
+                        Text(Fmt.hour(model.day.addingTimeInterval(Double(i) * 3600)))
+                            .font(Theme.hourLabel)
+                            .foregroundStyle(Theme.hourInk)
+                            .fixedSize()
+                            .opacity(scale.gridWeight(Double(i), label: true))
+                            .layoutValue(key: Slot.self, value: .label(Double(i)))
+                    }
                 }
             }
-            .modifier(PinnedToScreen(on: pinGrid))
             dayLayer(scale: scale, wet: wet, now: now)
         }
         .overlay(alignment: .topLeading) {
@@ -82,11 +92,11 @@ struct DayTimeline: View {
             // never reaches the card. With the grid held still the ball is held still too:
             // the page only marks where it belongs, and the pager draws it above the pages.
             ForEach(sunMarks, id: \.rising) { mark in
-                if pinGrid, let sunTrack {
-                    let key = SunTrack.Key(day: model.day, rising: mark.rising)
+                if pinGrid, let pinTrack {
+                    let key = PinTrack.Key(day: model.day, rising: mark.rising)
                     Color.clear
-                        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(SunTrack.space)).midY } action: { y in
-                            sunTrack.marks[key] = SunTrack.Mark(y: y, date: mark.date)
+                        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(PinTrack.space)).midY } action: { y in
+                            pinTrack.marks[key] = PinTrack.Mark(y: y, date: mark.date)
                         }
                         .layoutValue(key: Slot.self, value: .sunMark(mark.hour))
                 } else {
@@ -125,25 +135,6 @@ struct DayTimeline: View {
     static func dayHours(_ day: Date) -> Double {
         let end = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? day.addingTimeInterval(86400)
         return end.timeIntervalSince(day) / 3600
-    }
-}
-
-/// Takes back the page's sideways slide, so the grid stays where it is on screen while the
-/// page moves under it. The page's own scroll view clips it to the page: mid-swipe each
-/// page shows its own grid over its own part of the screen, and where both days have the
-/// same hours (they're lined up before a swipe) the two halves meet as one grid. Applied
-/// as the frame is drawn, so the swipe never redraws or lays out anything.
-private struct PinnedToScreen: ViewModifier {
-    let on: Bool
-
-    func body(content: Content) -> some View {
-        if on {
-            content.visualEffect { content, proxy in
-                content.offset(x: -proxy.frame(in: .scrollView(axis: .horizontal)).minX)
-            }
-        } else {
-            content
-        }
     }
 }
 
@@ -276,10 +267,12 @@ struct TimelineLayout: Layout {
 
 // MARK: - Sun
 
-/// Where the pages want their sun balls, for the pager to draw them above the pages when
-/// the grid is held still. Written as the pages move; read only by `SunOverlay`, so only
-/// the balls redraw.
-@MainActor @Observable final class SunTrack {
+// MARK: - Held still
+
+/// With the grid held still, where each page has its hours and its sun balls, for the
+/// pager to draw them once for all pages. Written as the pages move; read only by
+/// `PinnedGrid` and `SunOverlay`, so only they redraw.
+@MainActor @Observable final class PinTrack {
     struct Key: Hashable {
         let day: Date
         let rising: Bool
@@ -292,15 +285,120 @@ struct TimelineLayout: Layout {
 
     /// Centre of each page's ball, in the pager's coordinates.
     var marks: [Key: Mark] = [:]
+    /// Top of each day's timeline in the pager's coordinates (moves as it scrolls), and
+    /// its time scale.
+    var origins: [Date: CGFloat] = [:]
+    var scales: [Date: ScaleBlend] = [:]
     /// The page covering most of the screen; changes once, halfway through a swipe.
     var page = -1
+
+    /// How the grid and the balls move to a new day: on their own curve and time, however
+    /// fast or slow the swipe.
+    static let glide = Animation.smooth(duration: 0.5)
+}
+
+/// Eases a continuous page index to each new page, for what is held still while paging.
+/// One day over glides; a jump (to today, or the pager finding its first page) lands at
+/// once, rather than sweeping through days that aren't there.
+private struct FollowPage: ViewModifier {
+    let track: PinTrack
+    @Binding var page: Double
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { page = Double(track.page) }
+            .onChange(of: track.page) { old, new in
+                if abs(new - old) == 1 {
+                    withAnimation(PinTrack.glide) { page = Double(new) }
+                } else {
+                    page = Double(new)
+                }
+            }
+    }
+}
+
+/// Between two neighbouring pages' values, as far as the eased page index has gone; one
+/// alone if the other isn't there.
+private func between<T>(_ page: Double, _ value: (Int) -> T?, _ mix: (T, T, Double) -> T) -> T? {
+    let i = Int(page.rounded(.down))
+    let f = page - Double(i)
+    let a = value(i), b = f > 0.001 ? value(i + 1) : nil
+    switch (a, b) {
+    case let (a?, b?): return mix(a, b, f)
+    case let (a?, nil): return a
+    case let (nil, b?): return b
+    default: return nil
+    }
+}
+
+/// The hour grid held still while the days page over it. When the day changes, every line
+/// and label slides from where the old day has it to where the new day does, and lines in
+/// only one day's open hours fade in or out, so folded stretches close and open in place.
+/// Scrolling the day up or down, it follows at once.
+struct PinnedGrid: View {
+    let track: PinTrack
+    let days: [Date]
+    @State private var page: Double = 0
+
+    var body: some View {
+        GridGlide(page: page, track: track, days: days)
+            .modifier(FollowPage(track: track, page: $page))
+            .allowsHitTesting(false)
+    }
+}
+
+private struct GridGlide: View, Animatable {
+    var page: Double
+    let track: PinTrack
+    let days: [Date]
+
+    var animatableData: Double {
+        get { page }
+        set { page = newValue }
+    }
+
+    private struct Line {
+        var y: CGFloat
+        var line: Double
+        var label: Double
+    }
+
+    var body: some View {
+        // Read here, not inside the drawing, so a scroll redraws the grid.
+        let lines: [Line] = (0...24).map { (h: Int) -> Line in
+            between(page, { j -> Line? in
+                guard days.indices.contains(j), let o = track.origins[days[j]], let s = track.scales[days[j]] else { return nil }
+                let hour = Double(h)
+                return Line(y: o + Theme.topInset + s.y(hour), line: s.gridWeight(hour), label: s.gridWeight(hour, label: true))
+            }, { a, b, t in
+                Line(y: a.y + (b.y - a.y) * CGFloat(t), line: a.line + (b.line - a.line) * t,
+                     label: a.label + (b.label - a.label) * t)
+            }) ?? Line(y: 0, line: 0, label: 0)
+        }
+        Canvas { ctx, size in
+            for (h, l) in lines.enumerated() where l.y > -20 && l.y < size.height + 20 {
+                if l.line > 0.01 {
+                    let x = Theme.eventsLeading - 4
+                    ctx.fill(Path(CGRect(x: x, y: l.y - 0.5, width: size.width - x, height: 1)),
+                             with: .color(Theme.hairline.opacity(l.line)))
+                }
+                if h < 24, l.label > 0.01 {
+                    var label = ctx
+                    label.opacity = l.label
+                    label.draw(Text(String(format: "%02d", h)).font(Theme.hourLabel).foregroundStyle(Theme.hourInk),
+                               at: CGPoint(x: Theme.gutter - 6, y: l.y), anchor: .trailing)
+                }
+            }
+        }
+        .clipped()
+    }
 }
 
 /// The sun balls held still on screen while the days page under them. When the day
-/// changes, each glides up or down to where the new day has it, on its own easing curve
-/// and time, however fast or slow the swipe; scrolling the day up or down it follows at once.
+/// changes, each glides up or down to where the new day has it, with the grid; scrolling
+/// the day up or down it follows at once.
 struct SunOverlay: View {
-    let track: SunTrack
+    let track: PinTrack
     let days: [Date]
     /// The page the balls stand on, as a continuous index, eased from one day to the next.
     @State private var page: Double = 0
@@ -309,23 +407,14 @@ struct SunOverlay: View {
         let day = days.indices.contains(track.page) ? days[track.page] : nil
         ZStack(alignment: .topTrailing) {
             ForEach([true, false], id: \.self) { rising in
-                SunBall(date: day.flatMap { track.marks[SunTrack.Key(day: $0, rising: rising)]?.date } ?? .now,
+                SunBall(date: day.flatMap { track.marks[PinTrack.Key(day: $0, rising: rising)]?.date } ?? .now,
                         rising: rising)
                     .modifier(SunGlide(page: page, rising: rising, track: track, days: days))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         .clipped()
-        .onAppear { page = Double(track.page) }
-        .onChange(of: track.page) { old, new in
-            // One day over glides; a jump (to today, or the pager finding its first page)
-            // lands at once, rather than sweeping through days that aren't there.
-            if abs(new - old) == 1 {
-                withAnimation(.smooth(duration: 0.5)) { page = Double(new) }
-            } else {
-                page = Double(new)
-            }
-        }
+        .modifier(FollowPage(track: track, page: $page))
     }
 }
 
@@ -335,7 +424,7 @@ struct SunOverlay: View {
 private struct SunGlide: ViewModifier, Animatable {
     var page: Double
     let rising: Bool
-    let track: SunTrack
+    let track: PinTrack
     let days: [Date]
 
     var animatableData: Double {
@@ -353,18 +442,9 @@ private struct SunGlide: ViewModifier, Animatable {
     }
 
     private func spot() -> CGFloat? {
-        let i = Int(page.rounded(.down))
-        let f = CGFloat(page - Double(i))
-        func at(_ j: Int) -> CGFloat? {
-            days.indices.contains(j) ? track.marks[SunTrack.Key(day: days[j], rising: rising)]?.y : nil
-        }
-        let a = at(i), b = f > 0.001 ? at(i + 1) : nil
-        switch (a, b) {
-        case let (a?, b?): return a + (b - a) * f
-        case let (a?, nil): return a
-        case let (nil, b?): return b
-        default: return nil
-        }
+        between(page, { j -> CGFloat? in
+            days.indices.contains(j) ? track.marks[PinTrack.Key(day: days[j], rising: rising)]?.y : nil
+        }, { a, b, t in a + (b - a) * CGFloat(t) })
     }
 }
 

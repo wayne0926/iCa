@@ -22,8 +22,8 @@ struct DayPager: View {
     @State private var closing = false
     /// The moment the reader is looking at, shared by every page so paging keeps hours level.
     @State private var anchor: TimeAnchor?
-    /// With the grid held still, the sun balls are held still too, drawn here above the pages.
-    @State private var sunTrack = SunTrack()
+    /// With the grid held still, the grid and the sun balls are drawn here, once for all pages.
+    @State private var pinTrack = PinTrack()
     @AppStorage(DayTimeline.pinGridKey) private var pinGrid = false
 
     private let today = Calendar.current.startOfDay(for: Date())
@@ -94,9 +94,9 @@ struct DayPager: View {
             }
             .scrollTargetLayout()
         }
-        .coordinateSpace(.named(SunTrack.space))
+        .coordinateSpace(.named(PinTrack.space))
         .environment(activity)
-        .environment(sunTrack)
+        .environment(pinTrack)
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: $selection)
         .scrollIndicators(.hidden)
@@ -119,16 +119,20 @@ struct DayPager: View {
                 onDayChange(s)
             }
         }
-        // The page in view, for the held-still sun balls. Only they read it, and only
-        // when it changes.
+        // The page in view, for the held-still grid and sun balls. Only they read it, and
+        // only when it changes.
         .onScrollGeometryChange(for: Int.self) { g in
             let width = g.containerSize.width
             return width > 0 ? Int(((g.contentOffset.x + g.contentInsets.leading) / width).rounded()) : -1
         } action: { _, i in
-            sunTrack.page = i
+            pinTrack.page = i
+        }
+        // Held still, the grid lies under every page and the sun balls over them.
+        .background {
+            if pinGrid { PinnedGrid(track: pinTrack, days: days) }
         }
         .overlay {
-            if pinGrid { SunOverlay(track: sunTrack, days: days) }
+            if pinGrid { SunOverlay(track: pinTrack, days: days) }
         }
         .overlay(alignment: .bottomTrailing) {
             if let s = selection, s != today {
@@ -193,7 +197,6 @@ private struct DayHeader: View {
 
     @AppStorage("timelineZoom") private var zoom = TimelineZoom.standard.rawValue
     @AppStorage("timelineFullDay") private var fullDay = false
-    @AppStorage(DayTimeline.pinGridKey) private var pinGrid = false
 
     /// The widest date there is: it holds the room, so neither the weekday after it nor the
     /// button around it moves as the digits change.
@@ -256,15 +259,10 @@ private struct DayHeader: View {
                     HeaderButton(symbol: "arrow.up.and.down",
                                  label: grows ? "放大时间线" : "缩小时间线",
                                  action: { zoom = step.next.rawValue })
-                    // A grid held still while paging is one grid for every day, so no day
-                    // can fold its own empty hours: the whole day always shows, and there
-                    // is nothing to switch.
-                    if !pinGrid {
-                        Rectangle().fill(Theme.hairline).frame(width: 1, height: 18)
-                        // Filled clock = the whole 24 hours are showing.
-                        HeaderButton(symbol: fullDay ? "clock.fill" : "clock",
-                                     label: fullDay ? "折叠空闲时段" : "显示全天", action: { fullDay.toggle() })
-                    }
+                    Rectangle().fill(Theme.hairline).frame(width: 1, height: 18)
+                    // Filled clock = the whole 24 hours are showing.
+                    HeaderButton(symbol: fullDay ? "clock.fill" : "clock",
+                                 label: fullDay ? "折叠空闲时段" : "显示全天", action: { fullDay.toggle() })
                 }
                 .background(Theme.ink.opacity(0.07), in: Capsule())
             }

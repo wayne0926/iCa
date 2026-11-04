@@ -26,12 +26,8 @@ struct DayPage: View {
     /// The offset the driver last set; the scroll view reports it a frame late.
     @State private var drivenY: CGFloat?
     @AppStorage("timelineZoom") private var zoom = TimelineZoom.standard.rawValue
-    @AppStorage("timelineFullDay") private var fullDayChosen = false
+    @AppStorage("timelineFullDay") private var fullDay = false
     @AppStorage(DayTimeline.pinGridKey) private var pinGrid = false
-
-    /// A grid held still while paging is one grid for every page: every day on the same
-    /// scale, so none folds its own empty hours.
-    private var fullDay: Bool { fullDayChosen || pinGrid }
 
     /// The day pages' own frame of reference, so the zoom that opens and closes them never
     /// reads as the pages moving.
@@ -72,7 +68,8 @@ struct DayPage: View {
                 position.scrollTo(y: max(0, geo.offset + shift))
             }
         }
-        .background(Theme.paper)
+        // Held still, the grid lies under the pages, so a page lets it through.
+        .background(pinGrid ? Color.clear : Theme.paper)
         .onAppear {
             // After the first layout pass, or the scroll view has nothing to scroll yet.
             DispatchQueue.main.async {
