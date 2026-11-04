@@ -158,9 +158,9 @@ final class ZoomMarks {
 /// while its date is the shown one, its own otherwise. A modifier, so following the marks
 /// re-reads this alone, never the cell it wraps.
 ///
-/// The source is given the page's own paper and rounded corners: the shape that grows into
-/// the page, and shrinks back, is filled and rounded all the way, so nothing behind it
-/// shows through and its edges don't snap from square to round.
+/// No background or clip shape of its own: the system dims the month behind the page while
+/// it zooms, and a filled, rounded source then ends the close as a bright block with a hard
+/// edge against the dimmed grid. Plain, it ends in the cell as drawn.
 struct ZoomSource: ViewModifier {
     enum Kind: Hashable { case day, month }
 
@@ -169,17 +169,11 @@ struct ZoomSource: ViewModifier {
     let marks: ZoomMarks
     let zoom: Namespace.ID
 
-    private static let radius: CGFloat = 10
-
     func body(content: Content) -> some View {
         let id: ZoomKey = kind == .day
             ? (marks.day == date ? .shownDay : .day(date))
             : (marks.month == date ? .shownMonth : .month(date))
-        content.matchedTransitionSource(id: id, in: zoom) { source in
-            source
-                .background(Theme.paper)
-                .clipShape(RoundedRectangle(cornerRadius: Self.radius, style: .continuous))
-        }
+        content.matchedTransitionSource(id: id, in: zoom)
     }
 }
 
