@@ -267,14 +267,21 @@ private struct DayHeader: View {
 }
 
 /// The day's weather in the header's ink, built from layers instead of one symbol per kind,
-/// so paging between days changes only what differs: a cloud slides in front of the sun and
-/// hides it, the sun peeks out from behind, rain or snow appears under the same cloud (the
-/// system's Magic Replace, where it can match the two symbols).
+/// so paging between days changes only what differs and every change is a motion, never a
+/// swap: a cloud slides in front of the sun and hides it, the sun peeks out from behind;
+/// the cloud is always the same one, rising a little to make room as rain grows out of its
+/// underside, shrinks back into it, turns to snow or gives way to fog or a bolt.
+///
+/// The system's Magic Replace morphs only symbols it knows as variants of each other
+/// (cloud and cloud.rain are not), so the precipitation is drawn here, in the symbols'
+/// stroke weight, as shapes whose size animates.
 private struct WeatherGlyph: View {
     let kind: WeatherKind
 
     private static let motion = Animation.smooth(duration: 0.5)
-    private static let swap = ContentTransition.symbolEffect(.replace.magic(fallback: .replace.downUp))
+    private static let size = CGSize(width: 30, height: 26)
+    /// The symbols' semibold stroke at 17 pt.
+    private static let stroke = StrokeStyle(lineWidth: 1.9, lineCap: .round, lineJoin: .round)
 
     private enum Sun { case full, peek, gone }
 
@@ -286,63 +293,157 @@ private struct WeatherGlyph: View {
         }
     }
 
-    /// The cloud's symbol; nil when the sky is clear.
-    private var cloud: String? {
+    /// How far the rain reaches below the cloud; 0 is none.
+    private var drops: CGFloat {
         switch kind {
-        case .clear: return nil
-        case .fewClouds, .cloudy: return "cloud"
-        case .fog: return "cloud.fog"
-        case .drizzle: return "cloud.drizzle"
-        case .rain, .showers: return "cloud.rain"
-        case .heavyRain: return "cloud.heavyrain"
-        case .snow: return "cloud.snow"
-        case .sleet: return "cloud.sleet"
-        case .thunder: return "cloud.bolt.rain"
+        case .drizzle: return 2.5
+        case .rain, .showers: return 5.5
+        case .heavyRain: return 7.5
+        case .sleet: return 3.5
+        default: return 0
+        }
+    }
+
+    /// Snowflakes, first row and second row; sleet has only the second, between the drops.
+    private var flakes: (CGFloat, CGFloat) {
+        switch kind {
+        case .snow: return (1, 1)
+        case .sleet: return (0, 1)
+        default: return (0, 0)
         }
     }
 
     var body: some View {
-        // A clear sky keeps the plain cloud, faded out, so the next cloud has one to grow from.
-        let name = cloud ?? "cloud"
-        let shown = cloud != nil
+        let shown = kind != .clear
         let peek = sun == .peek
+        let fog: CGFloat = kind == .fog ? 1 : 0
+        let bolt = kind == .thunder
+        // Anything under the cloud: it rises and narrows a little to make room.
+        let under = drops > 0 || flakes.1 > 0 || fog > 0 || bolt
+        let place = CloudPlace(shown: shown, peek: peek, under: under)
         ZStack {
             Image(systemName: "sun.max")
-                .scaleEffect(sun == .full ? 1 : peek ? 0.68 : 0.5)
-                .offset(x: sun == .full ? 0 : peek ? 5 : 3, y: sun == .full ? 0 : peek ? -4 : -2)
+                .scaleEffect(sun == .full ? 1 : peek ? (under ? 0.62 : 0.68) : 0.5)
+                .offset(x: sun == .full ? 0 : peek ? 5 : 3,
+                        y: sun == .full ? 0 : peek ? (under ? -6 : -4) : -2)
                 .opacity(sun == .gone ? 0 : 1)
             // The cloud's shape, a little larger, cut out of the sun behind it: the cloud reads
             // as in front, with a sliver of air between them, on any background.
-            Image(systemName: name + ".fill")
-                .contentTransition(Self.swap)
+            Image(systemName: "cloud.fill")
                 .scaleEffect(1.14)
                 .blendMode(.destinationOut)
-                .modifier(CloudPlace(shown: shown, peek: peek))
-            Image(systemName: name)
-                .contentTransition(Self.swap)
-                .modifier(CloudPlace(shown: shown, peek: peek))
+                .modifier(place)
+            Image(systemName: "cloud")
+                .modifier(place)
+            Group {
+                Drops(length: drops)
+                    .stroke(style: Self.stroke)
+                Flakes(rows: AnimatablePair(flakes.0, flakes.1))
+                Mist(amount: fog)
+                    .stroke(style: Self.stroke)
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .scaleEffect(bolt ? 1 : 0.3, anchor: .top)
+                    .offset(y: 8)
+                    .opacity(bolt ? 1 : 0)
+            }
+            .frame(width: Self.size.width, height: Self.size.height)
+            .offset(x: place.x)
         }
         .compositingGroup()
         .font(.system(size: 17, weight: .semibold))
         .symbolRenderingMode(.monochrome)
         .foregroundStyle(Theme.ink)
-        .frame(width: 30, height: 26)
+        .frame(width: Self.size.width, height: Self.size.height)
         .animation(Self.motion, value: kind)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
     }
 
     /// Where the cloud sits: in from the lower left when it comes, beside the sun when the
-    /// sun peeks out, the whole glyph otherwise.
+    /// sun peeks out, raised when something falls from it, the whole glyph otherwise.
     private struct CloudPlace: ViewModifier {
         let shown: Bool
         let peek: Bool
+        let under: Bool
+
+        var x: CGFloat { !shown ? -10 : peek ? -2 : 0 }
+        var y: CGFloat { !shown ? 3 : (peek ? 2 : 0) - (under ? 5 : 0) }
+        var scale: CGFloat { (!shown ? 0.8 : peek ? 0.88 : 1) * (under ? 0.9 : 1) }
 
         func body(content: Content) -> some View {
             content
-                .scaleEffect(!shown ? 0.8 : peek ? 0.88 : 1)
-                .offset(x: !shown ? -10 : peek ? -2 : 0, y: !shown ? 3 : peek ? 2 : 0)
+                .scaleEffect(scale)
+                .offset(x: x, y: y)
                 .opacity(shown ? 1 : 0)
+        }
+    }
+
+    /// Where precipitation starts: just under the raised cloud.
+    private static let underside: CGFloat = 16.5
+
+    /// Three short slanted strokes, the middle one a little lower, growing out of the
+    /// cloud's underside; at length 0 there is nothing.
+    private struct Drops: Shape {
+        var length: CGFloat
+        var animatableData: CGFloat {
+            get { length }
+            set { length = newValue }
+        }
+
+        func path(in r: CGRect) -> Path {
+            var p = Path()
+            guard length > 0.1 else { return p }
+            for i in 0..<3 {
+                let x = r.midX + CGFloat(i - 1) * 5.5 + 1
+                let top = r.minY + WeatherGlyph.underside + (i == 1 ? 1.5 : 0)
+                p.move(to: CGPoint(x: x, y: top))
+                p.addLine(to: CGPoint(x: x - length * 0.35, y: top + length))
+            }
+            return p
+        }
+    }
+
+    /// Snowflakes as dots, in two staggered rows, each row growing and dropping into place.
+    private struct Flakes: Shape {
+        var rows: AnimatablePair<CGFloat, CGFloat>
+        var animatableData: AnimatablePair<CGFloat, CGFloat> {
+            get { rows }
+            set { rows = newValue }
+        }
+
+        func path(in r: CGRect) -> Path {
+            var p = Path()
+            let top = r.minY + WeatherGlyph.underside
+            func dot(_ x: CGFloat, _ y: CGFloat, _ a: CGFloat) {
+                guard a > 0.02 else { return }
+                let radius = 1.6 * a
+                let c = CGPoint(x: r.midX + x, y: top + y - (1 - a) * 3)
+                p.addEllipse(in: CGRect(x: c.x - radius, y: c.y - radius, width: radius * 2, height: radius * 2))
+            }
+            for i in 0..<3 { dot(CGFloat(i - 1) * 5.5, 2, rows.first) }
+            for i in 0..<2 { dot(CGFloat(i) * 5.5 - 2.75, 6.5, rows.second) }
+            return p
+        }
+    }
+
+    /// Fog: two lines under the cloud, drawn out from the middle.
+    private struct Mist: Shape {
+        var amount: CGFloat
+        var animatableData: CGFloat {
+            get { amount }
+            set { amount = newValue }
+        }
+
+        func path(in r: CGRect) -> Path {
+            var p = Path()
+            guard amount > 0.02 else { return p }
+            let top = r.minY + WeatherGlyph.underside
+            for (y, half) in [(CGFloat(2), CGFloat(8)), (CGFloat(6), CGFloat(5.5))] {
+                p.move(to: CGPoint(x: r.midX - half * amount, y: top + y))
+                p.addLine(to: CGPoint(x: r.midX + half * amount, y: top + y))
+            }
+            return p
         }
     }
 
