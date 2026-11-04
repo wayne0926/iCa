@@ -13,8 +13,6 @@ struct DayPage: View {
     let isActive: Bool
     @Binding var anchor: TimeAnchor?
     let onSelect: (CalEvent) -> Void
-    /// Back to the month grid.
-    let onClose: () -> Void
 
     @State private var position = ScrollPosition(edge: .top)
     @State private var didScroll = false
@@ -32,36 +30,27 @@ struct DayPage: View {
 
     private var hourHeight: CGFloat { (TimelineZoom(rawValue: zoom) ?? .standard).hourHeight }
 
+    /// Only the timeline: the date, the controls and the all-day events sit above the pager
+    /// and stay put while the days slide under them.
     var body: some View {
-        VStack(spacing: 0) {
-            DayHeader(model: model, isToday: isToday, fullDay: fullDay,
-                      zoomGrows: (TimelineZoom(rawValue: zoom) ?? .standard).next.hourHeight > hourHeight,
-                      onClose: onClose,
-                      onZoom: { zoom = (TimelineZoom(rawValue: zoom) ?? .standard).next.rawValue },
-                      onFullDay: { fullDay.toggle() })
-            if !model.allDay.isEmpty {
-                AllDayStrip(events: model.allDay, onSelect: onSelect)
-            }
-            Divider()
-            ScrollView(.vertical) {
-                DayTimeline(model: model, isToday: isToday, isActive: isActive,
-                            hourHeight: hourHeight, fullDay: fullDay, blend: blend, onSelect: onSelect,
-                            extraBottom: blend == nil ? 0 : geo.height)
-            }
-            .scrollPosition($position)
-            .scrollIndicators(.hidden)
-            .onScrollGeometryChange(for: Viewport.self) {
-                Viewport(offset: $0.contentOffset.y, height: $0.containerSize.height)
-            } action: { _, new in
-                geo.offset = new.offset
-                geo.height = new.height
-            }
-            // The pages beside follow once per gesture, not every frame: when a finger lands,
-            // when it lifts, when the scroll comes to rest. A finger landing to swipe sideways
-            // is one of those, so they are lined up before they come into view.
-            .onScrollPhaseChange { _, _ in publishAnchor() }
-            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { geo.top = $0 }
+        ScrollView(.vertical) {
+            DayTimeline(model: model, isToday: isToday, isActive: isActive,
+                        hourHeight: hourHeight, fullDay: fullDay, blend: blend, onSelect: onSelect,
+                        extraBottom: blend == nil ? 0 : geo.height)
         }
+        .scrollPosition($position)
+        .scrollIndicators(.hidden)
+        .onScrollGeometryChange(for: Viewport.self) {
+            Viewport(offset: $0.contentOffset.y, height: $0.containerSize.height)
+        } action: { _, new in
+            geo.offset = new.offset
+            geo.height = new.height
+        }
+        // The pages beside follow once per gesture, not every frame: when a finger lands,
+        // when it lifts, when the scroll comes to rest. A finger landing to swipe sideways
+        // is one of those, so they are lined up before they come into view.
+        .onScrollPhaseChange { _, _ in publishAnchor() }
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { geo.top = $0 }
         .background(Theme.paper)
         .onAppear {
             // After the first layout pass, or the scroll view has nothing to scroll yet.
@@ -167,140 +156,5 @@ struct DayPage: View {
         }
         position.scrollTo(y: max(0, y))
         didScroll = true
-    }
-}
-
-private struct DayHeader: View {
-    let model: DayModel
-    let isToday: Bool
-    let fullDay: Bool
-    /// The zoom button shows what a tap does: a plus while the next step is roomier.
-    let zoomGrows: Bool
-    let onClose: () -> Void
-    let onZoom: () -> Void
-    let onFullDay: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 8) {
-                // The date is the way back: a tap folds the day into its cell in the month.
-                Button(action: onClose) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(Fmt.monthDay(model.day))
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundStyle(Theme.ink)
-                        Text(model.day.formatted(Fmt.weekday))
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(isToday ? Theme.now : Theme.graphite)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Theme.ink.opacity(0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-                .buttonStyle(PressStyle())
-                .accessibilityLabel("返回月历")
-                Spacer(minLength: 0)
-                if let s = model.summary {
-                    HStack(spacing: 5) {
-                        Image(systemName: s.symbol)
-                            .foregroundStyle(Theme.symbolTint(s.kind, daylight: true))
-                        Text("\(s.low)° / \(s.high)°")
-                            .monospacedDigit()
-                    }
-                    .font(.system(size: 15, weight: .semibold))
-                }
-            }
-            HStack(spacing: 4) {
-                // Only rain earns words here.
-                if let wet = model.summary?.wetSpan {
-                    Label(wet, systemImage: "drop.fill")
-                        .foregroundStyle(Theme.rain)
-                        .font(.system(size: 13))
-                        .labelStyle(CompactLabelStyle())
-                }
-                Spacer(minLength: 0)
-                // Both controls share one capsule, split by a hairline.
-                HStack(spacing: 0) {
-                    HeaderButton(symbol: "arrow.up.and.down",
-                                 label: zoomGrows ? "放大时间线" : "缩小时间线", action: onZoom)
-                    Rectangle().fill(Theme.hairline).frame(width: 1, height: 18)
-                    // Filled clock = the whole 24 hours are showing.
-                    HeaderButton(symbol: fullDay ? "clock.fill" : "clock",
-                                 label: fullDay ? "折叠空闲时段" : "显示全天", action: onFullDay)
-                }
-                .background(Theme.ink.opacity(0.07), in: Capsule())
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
-        .padding(.bottom, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct HeaderButton: View {
-    let symbol: String
-    let label: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Theme.ink)
-                .contentTransition(.symbolEffect(.replace))
-                .frame(width: 46, height: 38)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-    }
-}
-
-/// Gives under the finger, so a block reads as something to press. Only the press is
-/// animated: the release is where the date's tap closes the page, and a spring back to
-/// full size and full opacity would still be running inside the page as it zooms down
-/// into its cell.
-private struct PressStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .opacity(configuration.isPressed ? 0.8 : 1)
-            .animation(configuration.isPressed ? .spring(duration: 0.25) : nil, value: configuration.isPressed)
-    }
-}
-
-struct CompactLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 4) {
-            configuration.icon.imageScale(.small)
-            configuration.title
-        }
-    }
-}
-
-private struct AllDayStrip: View {
-    let events: [CalEvent]
-    let onSelect: (CalEvent) -> Void
-
-    var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 6) {
-                ForEach(events) { e in
-                    Button { onSelect(e) } label: {
-                        Text(e.title)
-                            .lineLimit(1)
-                            .font(.system(size: 13, weight: .medium))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(CalendarInk.mark(e.calendarColor).opacity(0.18), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 16)
-        }
-        .scrollIndicators(.hidden)
-        .padding(.bottom, 8)
     }
 }
