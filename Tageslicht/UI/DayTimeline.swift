@@ -331,66 +331,160 @@ private func between<T>(_ page: Double, _ value: (Int) -> T?, _ mix: (T, T, Doub
     }
 }
 
-/// The hour grid held still while the days page over it. When the day changes, every line
-/// and label slides from where the old day has it to where the new day does, and lines in
-/// only one day's open hours fade in or out, so folded stretches close and open in place.
-/// Scrolling the day up or down, it follows at once.
+/// The hour grid held still while the days page over it. It never jumps: whatever moves
+/// it — a new day, a day whose events changed, a fold or zoom landing at once — it slides
+/// from where it is on screen to where it belongs, and lines open on only one side fade
+/// in or out, so folded stretches close and open in place. Only scrolling the day up or
+/// down moves it at once, with the day.
 struct PinnedGrid: View {
     let track: PinTrack
     let days: [Date]
-    @State private var page: Double = 0
+    @State private var follow = GridFollow()
+    /// Flipped to start or stop the frame clock; nothing else.
+    @State private var wake = false
 
     var body: some View {
-        GridGlide(page: page, track: track, days: days)
-            .modifier(FollowPage(track: track, page: $page))
-            .allowsHitTesting(false)
-    }
-}
-
-private struct GridGlide: View, Animatable {
-    var page: Double
-    let track: PinTrack
-    let days: [Date]
-
-    var animatableData: Double {
-        get { page }
-        set { page = newValue }
-    }
-
-    private struct Line {
-        var y: CGFloat
-        var line: Double
-        var label: Double
-    }
-
-    var body: some View {
-        // Read here, not inside the drawing, so a scroll redraws the grid.
-        let lines: [Line] = (0...24).map { (h: Int) -> Line in
-            between(page, { j -> Line? in
-                guard days.indices.contains(j), let o = track.origins[days[j]], let s = track.scales[days[j]] else { return nil }
-                let hour = Double(h)
-                return Line(y: o + Theme.topInset + s.y(hour), line: s.gridWeight(hour), label: s.gridWeight(hour, label: true))
-            }, { a, b, t in
-                Line(y: a.y + (b.y - a.y) * CGFloat(t), line: a.line + (b.line - a.line) * t,
-                     label: a.label + (b.label - a.label) * t)
-            }) ?? Line(y: 0, line: 0, label: 0)
-        }
-        Canvas { ctx, size in
-            for (h, l) in lines.enumerated() where l.y > -20 && l.y < size.height + 20 {
-                if l.line > 0.01 {
-                    let x = Theme.eventsLeading - 4
-                    ctx.fill(Path(CGRect(x: x, y: l.y - 0.5, width: size.width - x, height: 1)),
-                             with: .color(Theme.hairline.opacity(l.line)))
+        // Read here, so a scroll or a new day redraws the grid.
+        let target = currentTarget()
+        let _ = wake
+        TimelineView(.animation(paused: follow.idle)) { timeline in
+            Canvas { ctx, size in
+                let lines = follow.frame(toward: target, at: timeline.date) {
+                    DispatchQueue.main.async { wake.toggle() }
                 }
-                if h < 24, l.label > 0.01 {
-                    var label = ctx
-                    label.opacity = l.label
-                    label.draw(Text(String(format: "%02d", h)).font(Theme.hourLabel).foregroundStyle(Theme.hourInk),
-                               at: CGPoint(x: Theme.gutter - 6, y: l.y), anchor: .trailing)
+                for (h, l) in lines.enumerated() where l.y > -20 && l.y < size.height + 20 {
+                    if l.line > 0.01 {
+                        let x = Theme.eventsLeading - 4
+                        ctx.fill(Path(CGRect(x: x, y: l.y - 0.5, width: size.width - x, height: 1)),
+                                 with: .color(Theme.hairline.opacity(min(1, l.line))))
+                    }
+                    if h < 24, l.label > 0.01 {
+                        var label = ctx
+                        label.opacity = min(1, l.label)
+                        label.draw(Text(String(format: "%02d", h)).font(Theme.hourLabel).foregroundStyle(Theme.hourInk),
+                                   at: CGPoint(x: Theme.gutter - 6, y: l.y), anchor: .trailing)
+                    }
                 }
             }
         }
         .clipped()
+        .allowsHitTesting(false)
+    }
+
+    /// The day in view, once its page has said where its hours are.
+    private func currentTarget() -> GridFollow.Target? {
+        guard days.indices.contains(track.page) else { return nil }
+        let day = days[track.page]
+        guard let origin = track.origins[day], let scale = track.scales[day] else { return nil }
+        return GridFollow.Target(day: day, origin: origin, scale: scale)
+    }
+}
+
+/// Where the grid is drawn: its target, plus how far each line still is from it. Any
+/// change of target other than a scroll is taken up by that distance, which then springs
+/// back to nothing, critically damped, so it eases out without overshooting. Not observed:
+/// a frame of it redraws nothing else.
+private final class GridFollow {
+    struct Target {
+        let day: Date
+        /// Top of the day's timeline in the pager's coordinates.
+        let origin: CGFloat
+        let scale: ScaleBlend
+    }
+
+    struct Line {
+        var y: CGFloat = 0
+        var line: Double = 0
+        var label: Double = 0
+    }
+
+    private(set) var idle = true
+    private var last: Target?
+    /// Shown minus target, and how fast that is changing, per whole hour 0...24.
+    private var gap = Array(repeating: Line(), count: 25)
+    private var speed = Array(repeating: Line(), count: 25)
+    private var time: Date?
+
+    /// About the time a change takes to settle.
+    private static let response = 0.5
+    private static let w = 2 * Double.pi / response
+
+    /// The lines to draw now. `wake` is called when the clock has to start or may stop.
+    func frame(toward new: Target?, at now: Date, wake: () -> Void) -> [Line] {
+        guard let target = new ?? last else { return [] }
+        if let old = last, Self.jumps(from: old, to: target) {
+            // Keep every line where it is on screen right now.
+            let a = Self.lines(old), b = Self.lines(target)
+            for h in gap.indices {
+                gap[h].y += a[h].y - b[h].y
+                gap[h].line += a[h].line - b[h].line
+                gap[h].label += a[h].label - b[h].label
+            }
+            if idle {
+                idle = false
+                time = nil
+                wake()
+            }
+        }
+        last = target
+        if !idle { step(to: now, wake: wake) }
+        let base = Self.lines(target)
+        return base.indices.map { h in
+            Line(y: base[h].y + gap[h].y,
+                 line: max(0, base[h].line + gap[h].line),
+                 label: max(0, base[h].label + gap[h].label))
+        }
+    }
+
+    /// A scroll moves only the origin and is followed at once; so is a zoom or fold while
+    /// it animates (it is already smooth). Anything else is a jump to be eased.
+    private static func jumps(from old: Target, to new: Target) -> Bool {
+        if old.day != new.day { return true }
+        let settled = old.scale.from == old.scale.to && new.scale.from == new.scale.to
+        return settled && old.scale != new.scale
+    }
+
+    private static func lines(_ t: Target) -> [Line] {
+        (0...24).map { h in
+            let hour = Double(h)
+            return Line(y: t.origin + Theme.topInset + t.scale.y(hour),
+                        line: t.scale.gridWeight(hour), label: t.scale.gridWeight(hour, label: true))
+        }
+    }
+
+    private func step(to now: Date, wake: () -> Void) {
+        guard let then = time else { time = now; return }
+        time = now
+        // A stall (the app in the background) doesn't fling anything.
+        let dt = min(now.timeIntervalSince(then), 1.0 / 20)
+        guard dt > 0 else { return }
+        let n = Int((dt * 240).rounded(.up))
+        let h = dt / Double(n)
+        let w = Self.w
+        for _ in 0..<n {
+            for i in gap.indices {
+                let ay = -w * w * Double(gap[i].y) - 2 * w * Double(speed[i].y)
+                speed[i].y += CGFloat(ay * h)
+                gap[i].y += speed[i].y * CGFloat(h)
+                let al = -w * w * gap[i].line - 2 * w * speed[i].line
+                speed[i].line += al * h
+                gap[i].line += speed[i].line * h
+                let ab = -w * w * gap[i].label - 2 * w * speed[i].label
+                speed[i].label += ab * h
+                gap[i].label += speed[i].label * h
+            }
+        }
+        let still = gap.indices.allSatisfy { i in
+            abs(gap[i].y) < 0.25 && abs(speed[i].y) < 4
+                && abs(gap[i].line) < 0.004 && abs(gap[i].label) < 0.004
+        }
+        if still {
+            gap = Array(repeating: Line(), count: gap.count)
+            speed = gap
+            idle = true
+            time = nil
+            wake()
+        }
     }
 }
 
